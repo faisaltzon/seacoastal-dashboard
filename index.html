@@ -432,28 +432,46 @@ function getDateRange(){
 
 async function fetchVapi(k){
   const {start,end} = getDateRange();
-  // Vapi API - fetch all calls paginated
   let allCalls = [];
-  let createdAtBefore = end;
+  // Fetch without date filter first, then filter client-side
+  // Vapi uses startedAt field, not createdAt
   for(let i=0;i<10;i++){
     const params = new URLSearchParams({
       assistantId: k.asst,
       limit: '100',
-      createdAtGt: start,
-      createdAtLt: createdAtBefore
+      ...(i>0 ? {} : {})
     });
+    // Use correct Vapi date params
+    if(start) params.set('startedAtGt', start);
+    if(end)   params.set('startedAtLt', end);
     const url = 'https://api.vapi.ai/call?' + params.toString();
     const res = await fetch(url, {headers:{Authorization:'Bearer '+k.vapi}});
     if(!res.ok){
-      const errText = await res.text();
-      throw new Error('Vapi '+res.status+': '+errText.slice(0,100));
+      // Fallback: fetch without date filter
+      const url2 = 'https://api.vapi.ai/call?assistantId='+k.asst+'&limit=1000';
+      const res2 = await fetch(url2, {headers:{Authorization:'Bearer '+k.vapi}});
+      if(!res2.ok){
+        const errText = await res2.text();
+        throw new Error('Vapi '+res2.status+': '+errText.slice(0,120));
+      }
+      const d2 = await res2.json();
+      const allRaw = Array.isArray(d2)?d2:(d2.calls||d2.data||[]);
+      // Filter client-side by startedAt or createdAt
+      const startTs = new Date(start).getTime();
+      const endTs   = new Date(end).getTime();
+      return allRaw.filter(c=>{
+        const t = new Date(c.startedAt||c.createdAt||c.start_time||0).getTime();
+        return t >= startTs && t <= endTs;
+      });
     }
     const d = await res.json();
     const calls = Array.isArray(d)?d:(d.calls||d.data||[]);
     allCalls = allCalls.concat(calls);
     if(calls.length < 100) break;
-    // paginate by using earliest call's createdAt as next upper bound
-    createdAtBefore = calls[calls.length-1].createdAt;
+    const last = calls[calls.length-1];
+    const lastTs = last.startedAt||last.createdAt||last.start_time;
+    if(!lastTs) break;
+    params.set('startedAtLt', lastTs);
   }
   return allCalls;
 }
@@ -463,18 +481,38 @@ function processVapi(calls){
   const weekBuckets=Array(8).fill(0);
   const now=Date.now();
   calls.forEach(c=>{
+    // Only count real outbound/inbound calls, skip web test calls
+    const callType=(c.type||'').toLowerCase();
+    const hasPhone = c.customer?.number || c.phoneNumber || c.customerPhoneNumber;
+    if(callType==='webCall'||callType==='web') return; // skip web test calls
+
     dialed++;
-    const dur=c.duration||c.durationSeconds||0;
-    const er=(c.endedReason||c.end_reason||'').toLowerCase();
-    if(dur>0){connected++;durSum+=dur;durN++;}
-    if(dur>0&&dur<10) hangup++;
-    if(er.includes('voicemail')||er.includes('vm')) vm++;
-    if(dur>=30) done++;
-    const created=new Date(c.createdAt||c.created_at||now).getTime();
-    const wa=Math.floor((now-created)/(7*24*3600*1000));
+    // Duration: Vapi uses 'duration' in seconds or startedAt/endedAt diff
+    let dur = c.duration||c.durationSeconds||0;
+    if(!dur && c.startedAt && c.endedAt){
+      dur = (new Date(c.endedAt).getTime() - new Date(c.startedAt).getTime()) / 1000;
+    }
+
+    const er=(c.endedReason||c.ended_reason||c.end_reason||'').toLowerCase();
+    const status=(c.status||'').toLowerCase();
+    const success=(c.successEvaluation||c.success_evaluation||'').toLowerCase();
+
+    // Connected = call was answered (has duration > 0 or assistant/customer ended it)
+    if(dur>0 || er.includes('customer-ended')||er.includes('assistant-ended')){
+      connected++;
+      if(dur>0){durSum+=dur;durN++;}
+    }
+
+    if(dur>0 && dur<10) hangup++;
+    if(er.includes('voicemail')||er.includes('vm')||er.includes('no-answer')) vm++;
+    if(dur>=30) done++; // quality call
+
+    // Week bucket
+    const ts=new Date(c.startedAt||c.createdAt||c.start_time||now).getTime();
+    const wa=Math.floor((now-ts)/(7*24*3600*1000));
     if(wa<8) weekBuckets[7-wa]++;
   });
-  return{dialed,connected,hangup,vm,done,noAnswer:dialed-connected,
+  return{dialed,connected,hangup,vm,done,noAnswer:Math.max(0,dialed-connected),
     avgDur:durN>0?Math.round(durSum/durN):0,weekBuckets};
 }
 
