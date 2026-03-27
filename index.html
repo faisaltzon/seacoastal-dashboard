@@ -417,18 +417,19 @@ function fmtPct(a,b){ return b>0?(a/b*100).toFixed(1)+'%':'0%'; }
 
 function getDateRange(){
   const now = new Date();
+  // Vapi requires strict ISO 8601 — use toISOString() which gives YYYY-MM-DDTHH:mm:ss.sssZ
   const end = now.toISOString();
   let start;
   if(currentRange==='today'){
     const s = new Date(now); s.setHours(0,0,0,0); start=s.toISOString();
   } else if(currentRange==='week'){
-    const s = new Date(now); s.setDate(s.getDate()-7); start=s.toISOString();
+    const s = new Date(now); s.setDate(s.getDate()-7); s.setHours(0,0,0,0); start=s.toISOString();
   } else if(currentRange==='month'){
     const s = new Date(now); s.setDate(1); s.setHours(0,0,0,0); start=s.toISOString();
   } else {
-    const s = new Date('2024-01-01'); start=s.toISOString();
+    const s = new Date('2024-01-01T00:00:00.000Z'); start=s.toISOString();
   }
-  return {start,end};
+  return {start, end};
 }
 
 async function fetchVapi(k){
@@ -441,9 +442,9 @@ async function fetchVapi(k){
 
   for(let i=0;i<10;i++){
     let url = 'https://api.vapi.ai/call?assistantId='+k.asst+'&limit=100';
-    if(start) url += '&createdAtGt='+encodeURIComponent(start);
-    if(end)   url += '&createdAtLt='+encodeURIComponent(end);
-    if(lastCreatedAt) url += '&createdAtLt='+encodeURIComponent(lastCreatedAt);
+    if(start) url += '&createdAtGt='+start.replace('+','%2B');
+    if(end)   url += '&createdAtLt='+end.replace('+','%2B');
+    if(lastCreatedAt) url += '&createdAtLt='+lastCreatedAt.replace('+','%2B');
 
     const res = await fetch(url, {headers:{Authorization:'Bearer '+k.vapi}});
     if(!res.ok){
