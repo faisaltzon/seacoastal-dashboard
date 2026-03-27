@@ -481,39 +481,42 @@ function processVapi(calls){
   const weekBuckets=Array(8).fill(0);
   const now=Date.now();
   calls.forEach(c=>{
-    // Only count real outbound/inbound calls, skip web test calls
-    const callType=(c.type||'').toLowerCase();
-    const hasPhone = c.customer?.number || c.phoneNumber || c.customerPhoneNumber;
-    if(callType==='webCall'||callType==='web') return; // skip web test calls
-
     dialed++;
-    // Duration: Vapi uses 'duration' in seconds or startedAt/endedAt diff
-    let dur = c.duration||c.durationSeconds||0;
+
+    // Duration — try multiple field names Vapi uses
+    let dur = c.duration || c.durationSeconds || c.durationMs/1000 || 0;
     if(!dur && c.startedAt && c.endedAt){
-      dur = (new Date(c.endedAt).getTime() - new Date(c.startedAt).getTime()) / 1000;
+      dur = Math.max(0,(new Date(c.endedAt).getTime()-new Date(c.startedAt).getTime())/1000);
     }
 
-    const er=(c.endedReason||c.ended_reason||c.end_reason||'').toLowerCase();
-    const status=(c.status||'').toLowerCase();
-    const success=(c.successEvaluation||c.success_evaluation||'').toLowerCase();
+    const er=(c.endedReason||c.ended_reason||c.endReason||'').toLowerCase();
 
-    // Connected = call was answered (has duration > 0 or assistant/customer ended it)
-    if(dur>0 || er.includes('customer-ended')||er.includes('assistant-ended')){
+    // Connected = any call that had some duration OR ended by either party
+    if(dur>0){
       connected++;
-      if(dur>0){durSum+=dur;durN++;}
+      durSum+=dur;
+      durN++;
     }
 
     if(dur>0 && dur<10) hangup++;
-    if(er.includes('voicemail')||er.includes('vm')||er.includes('no-answer')) vm++;
-    if(dur>=30) done++; // quality call
 
-    // Week bucket
+    // Voicemail — no-answer, vm, voicemail end reasons
+    if(er.includes('voicemail')||er.includes('no-answer')||er.includes('no_answer')) vm++;
+
+    // Quality call = 30+ seconds
+    if(dur>=30) done++;
+
+    // Week bucket using startedAt or createdAt
     const ts=new Date(c.startedAt||c.createdAt||c.start_time||now).getTime();
     const wa=Math.floor((now-ts)/(7*24*3600*1000));
-    if(wa<8) weekBuckets[7-wa]++;
+    if(wa>=0&&wa<8) weekBuckets[7-wa]++;
   });
-  return{dialed,connected,hangup,vm,done,noAnswer:Math.max(0,dialed-connected),
-    avgDur:durN>0?Math.round(durSum/durN):0,weekBuckets};
+  return{
+    dialed, connected, hangup, vm, done,
+    noAnswer: Math.max(0,dialed-connected),
+    avgDur: durN>0?Math.round(durSum/durN):0,
+    weekBuckets
+  };
 }
 
 async function fetchAllGHL(url, headers, key){
