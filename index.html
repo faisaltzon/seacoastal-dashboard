@@ -432,46 +432,29 @@ function getDateRange(){
 
 async function fetchVapi(k){
   const {start,end} = getDateRange();
+  // Vapi confirmed fields: createdAt, startedAt, endedAt, endedReason, status, type
+  // No durationSeconds — must calculate from startedAt/endedAt
+  // Date filter uses createdAtGt / createdAtLt
   let allCalls = [];
-  // Fetch without date filter first, then filter client-side
-  // Vapi uses startedAt field, not createdAt
+  let lastCreatedAt = null;
+
   for(let i=0;i<10;i++){
-    const params = new URLSearchParams({
-      assistantId: k.asst,
-      limit: '100',
-      ...(i>0 ? {} : {})
-    });
-    // Use correct Vapi date params
-    if(start) params.set('startedAtGt', start);
-    if(end)   params.set('startedAtLt', end);
-    const url = 'https://api.vapi.ai/call?' + params.toString();
+    let url = 'https://api.vapi.ai/call?assistantId='+k.asst+'&limit=100';
+    if(start) url += '&createdAtGt='+encodeURIComponent(start);
+    if(end)   url += '&createdAtLt='+encodeURIComponent(end);
+    if(lastCreatedAt) url += '&createdAtLt='+encodeURIComponent(lastCreatedAt);
+
     const res = await fetch(url, {headers:{Authorization:'Bearer '+k.vapi}});
     if(!res.ok){
-      // Fallback: fetch without date filter
-      const url2 = 'https://api.vapi.ai/call?assistantId='+k.asst+'&limit=1000';
-      const res2 = await fetch(url2, {headers:{Authorization:'Bearer '+k.vapi}});
-      if(!res2.ok){
-        const errText = await res2.text();
-        throw new Error('Vapi '+res2.status+': '+errText.slice(0,120));
-      }
-      const d2 = await res2.json();
-      const allRaw = Array.isArray(d2)?d2:(d2.calls||d2.data||[]);
-      // Filter client-side by startedAt or createdAt
-      const startTs = new Date(start).getTime();
-      const endTs   = new Date(end).getTime();
-      return allRaw.filter(c=>{
-        const t = new Date(c.startedAt||c.createdAt||c.start_time||0).getTime();
-        return t >= startTs && t <= endTs;
-      });
+      const err = await res.text();
+      throw new Error('Vapi API '+res.status+': '+err.slice(0,150));
     }
     const d = await res.json();
     const calls = Array.isArray(d)?d:(d.calls||d.data||[]);
+    if(!calls.length) break;
     allCalls = allCalls.concat(calls);
     if(calls.length < 100) break;
-    const last = calls[calls.length-1];
-    const lastTs = last.startedAt||last.createdAt||last.start_time;
-    if(!lastTs) break;
-    params.set('startedAtLt', lastTs);
+    lastCreatedAt = calls[calls.length-1].createdAt;
   }
   return allCalls;
 }
@@ -480,37 +463,41 @@ function processVapi(calls){
   let dialed=0,connected=0,hangup=0,vm=0,done=0,durSum=0,durN=0;
   const weekBuckets=Array(8).fill(0);
   const now=Date.now();
+
   calls.forEach(c=>{
     dialed++;
 
-    // Duration — try multiple field names Vapi uses
-    let dur = c.duration || c.durationSeconds || c.durationMs/1000 || 0;
-    if(!dur && c.startedAt && c.endedAt){
+    // Vapi has NO durationSeconds field — calculate from startedAt/endedAt
+    let dur = 0;
+    if(c.startedAt && c.endedAt){
       dur = Math.max(0,(new Date(c.endedAt).getTime()-new Date(c.startedAt).getTime())/1000);
     }
 
-    const er=(c.endedReason||c.ended_reason||c.endReason||'').toLowerCase();
+    // endedReason confirmed field name from Vapi docs
+    const er = (c.endedReason||'').toLowerCase();
 
-    // Connected = any call that had some duration OR ended by either party
-    if(dur>0){
+    // Connected = call started (has startedAt)
+    if(c.startedAt){
       connected++;
-      durSum+=dur;
-      durN++;
+      if(dur>0){ durSum+=dur; durN++; }
     }
 
+    // Hung up early = answered but under 10 seconds
     if(dur>0 && dur<10) hangup++;
 
-    // Voicemail — no-answer, vm, voicemail end reasons
-    if(er.includes('voicemail')||er.includes('no-answer')||er.includes('no_answer')) vm++;
+    // Voicemail end reasons from Vapi
+    if(er==='voicemail'||er==='no-answer'||er==='customer-did-not-answer'||
+       er.includes('voicemail')||er.includes('no-answer')) vm++;
 
-    // Quality call = 30+ seconds
+    // Quality call = 30+ seconds conversation
     if(dur>=30) done++;
 
-    // Week bucket using startedAt or createdAt
-    const ts=new Date(c.startedAt||c.createdAt||c.start_time||now).getTime();
-    const wa=Math.floor((now-ts)/(7*24*3600*1000));
-    if(wa>=0&&wa<8) weekBuckets[7-wa]++;
+    // Week bucket — use createdAt (confirmed Vapi field)
+    const ts = new Date(c.createdAt||c.startedAt||now).getTime();
+    const wa = Math.floor((now-ts)/(7*24*3600*1000));
+    if(wa>=0 && wa<8) weekBuckets[7-wa]++;
   });
+
   return{
     dialed, connected, hangup, vm, done,
     noAnswer: Math.max(0,dialed-connected),
