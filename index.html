@@ -192,6 +192,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
   <div class="content">
 
     <div id="err-vapi" class="err"></div>
+    <div id="vapi-debug" style="display:none;background:var(--surface);border:1px solid var(--amber);border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px;"></div>
     <div id="err-ghl" class="err"></div>
     <div id="err-sheet" class="err"></div>
 
@@ -453,6 +454,7 @@ async function fetchVapi(k){
     const calls = Array.isArray(d)?d:(d.calls||d.data||[]);
     if(!calls.length) break;
     allCalls = allCalls.concat(calls);
+    window._vapiRaw = allCalls;
     if(calls.length < 100) break;
     lastCreatedAt = calls[calls.length-1].createdAt;
   }
@@ -746,6 +748,26 @@ async function refreshAll(){
     document.getElementById('mc-conn').className='mcard '+(cr>0.5?'green':cr>0.25?'amber':'red');
     renderWeekly(v.weekBuckets);
     renderOutcome(v);
+
+    // DEBUG panel — shows raw first call so we can see field names
+    const dbg = document.getElementById('vapi-debug');
+    if(dbg && window._vapiRaw && window._vapiRaw.length>0){
+      const sample = window._vapiRaw[0];
+      dbg.style.display='block';
+      dbg.innerHTML = '<strong style="color:var(--amber)">Vapi debug — first call object:</strong><br><pre style="font-size:10px;color:var(--muted);white-space:pre-wrap;word-break:break-all;">'+
+        JSON.stringify({
+          id: sample.id,
+          type: sample.type,
+          status: sample.status,
+          endedReason: sample.endedReason,
+          createdAt: sample.createdAt,
+          startedAt: sample.startedAt,
+          endedAt: sample.endedAt,
+          duration: sample.duration,
+          durationSeconds: sample.durationSeconds,
+          cost: sample.cost
+        }, null, 2)+'</pre>';
+    }
   }catch(e){showErr('err-vapi','Vapi error: '+e.message+' — verify your Vapi API key.');}
 
   // GHL
