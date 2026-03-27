@@ -210,7 +210,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
         <button class="btn primary" onclick="saveKeys()">Save &amp; Connect</button>
         <button class="btn" onclick="toggleSetup()">Dismiss</button>
       </div>
-      <p class="keys-note">Saved in your browser only — never sent anywhere except directly to Vapi, GHL, and Google Sheets APIs.</p>
+      <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;"/>
+  <h3 style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;">Daily KPI goals</h3>
+  <div class="keys-grid">
+    <div class="kf"><label>Quality calls goal / day</label><input id="k-goal-calls" type="number" placeholder="35"/></div>
+    <div class="kf"><label>Offers goal / day</label><input id="k-goal-offers" type="number" placeholder="5"/></div>
+  </div>
+  <p class="keys-note">Saved in your browser only — never sent anywhere except directly to Vapi, GHL, and Google Sheets APIs.</p>
     </div>
 
     <!-- VAPI METRICS -->
@@ -224,18 +230,45 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
       <div class="mcard purple"><div class="mc-label">Completed</div><div class="mc-val" id="v-done">—</div><div class="mc-sub">full convos</div></div>
     </div>
 
-    <!-- GHL METRICS -->
-    <div class="section-label">Pipeline &amp; CRM</div>
+    <!-- CALL GOAL -->
+    <div class="section-label">Call goal — daily target</div>
+    <div class="metric-row mg4" style="margin-bottom:16px;">
+      <div class="mcard" id="mc-quality">
+        <div class="mc-label">Quality calls <span style="opacity:0.5;font-weight:400;">goal: <span id="goal-calls-disp">35</span>/day</span></div>
+        <div class="mc-val" id="v-quality">—</div>
+        <div style="margin-top:8px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;">
+          <div id="goal-fill-calls" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 0.5s;"></div>
+        </div>
+        <div class="mc-sub" id="v-quality-sub">calls &gt;30s counted as quality</div>
+      </div>
+      <div class="mcard blue"><div class="mc-label">Total dialed</div><div class="mc-val" id="v-dialed2">—</div><div class="mc-sub">all outbound</div></div>
+      <div class="mcard amber"><div class="mc-label">Connected</div><div class="mc-val" id="v-connected2">—</div><div class="mc-sub" id="v-crate2">—% rate</div></div>
+      <div class="mcard"><div class="mc-label">Avg duration</div><div class="mc-val" id="v-dur2">—</div><div class="mc-sub">seconds</div></div>
+    </div>
+
+    <!-- GHL MESSAGING -->
+    <div class="section-label">GHL — messaging</div>
     <div class="metric-row mg4" style="margin-bottom:16px;">
       <div class="mcard green"><div class="mc-label">Total leads</div><div class="mc-val" id="g-leads">—</div><div class="mc-sub">contacts in GHL</div></div>
-      <div class="mcard blue"><div class="mc-label">Tier 1 hot</div><div class="mc-val" id="g-t1">—</div><div class="mc-sub">deal alerts fired</div></div>
-      <div class="mcard amber"><div class="mc-label">Contracts</div><div class="mc-val" id="g-cont">—</div><div class="mc-sub">submitted</div></div>
-      <div class="mcard purple"><div class="mc-label">Won deals</div><div class="mc-val" id="g-won">—</div><div class="mc-sub">closed</div></div>
-    </div>
-    <div class="metric-row mg3" style="margin-bottom:20px;">
-      <div class="mcard"><div class="mc-label">SMS sent</div><div class="mc-val" id="g-sms">—</div><div class="mc-sub">total messages</div></div>
-      <div class="mcard"><div class="mc-label">Leads per close</div><div class="mc-val" id="g-lpc">—</div><div class="mc-sub">conversion ratio</div></div>
+      <div class="mcard blue"><div class="mc-label">SMS sent</div><div class="mc-val" id="g-sms">—</div><div class="mc-sub">total messages</div></div>
+      <div class="mcard purple"><div class="mc-label">Responses</div><div class="mc-val" id="g-resp">—</div><div class="mc-sub">inbound replies</div></div>
       <div class="mcard red"><div class="mc-label">Opted out</div><div class="mc-val" id="g-opt">—</div><div class="mc-sub">DNC / STOP</div></div>
+    </div>
+
+    <!-- OFFER + CONTRACT GOALS -->
+    <div class="section-label">Offers &amp; contracts — daily goals</div>
+    <div class="metric-row mg4" style="margin-bottom:20px;">
+      <div class="mcard" id="mc-offers">
+        <div class="mc-label">Offers made <span style="opacity:0.5;font-weight:400;">goal: <span id="goal-offers-disp">5</span>/day</span></div>
+        <div class="mc-val" id="g-offers">—</div>
+        <div style="margin-top:8px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;">
+          <div id="goal-fill-offers" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 0.5s;"></div>
+        </div>
+        <div class="mc-sub" id="g-offers-sub">goal: 5 offers/day</div>
+      </div>
+      <div class="mcard amber"><div class="mc-label">Tier 1 hot</div><div class="mc-val" id="g-t1">—</div><div class="mc-sub">deal alerts fired</div></div>
+      <div class="mcard purple"><div class="mc-label">Contracts signed</div><div class="mc-val" id="g-cont">—</div><div class="mc-sub">executed</div></div>
+      <div class="mcard green"><div class="mc-label">Sent to buyer / Won</div><div class="mc-val" id="g-won">—</div><div class="mc-sub">closed deals</div></div>
     </div>
 
     <!-- CHARTS ROW -->
@@ -339,6 +372,10 @@ function saveKeys(){
     const el = document.getElementById('k-'+k);
     if(el && el.value.trim()) localStorage.setItem('sc2_'+k, el.value.trim());
   });
+  const gc=document.getElementById('k-goal-calls');
+  const go=document.getElementById('k-goal-offers');
+  if(gc&&gc.value) localStorage.setItem('sc2_goal_calls', gc.value);
+  if(go&&go.value) localStorage.setItem('sc2_goal_offers', go.value);
   toggleSetup();
   refreshAll();
 }
@@ -353,6 +390,10 @@ function toggleSetup(){
     document.getElementById('k-loc').value   = k.loc;
     document.getElementById('k-sheet').value = k.sheet;
     document.getElementById('k-tab').value   = k.tab;
+    const gcEl=document.getElementById('k-goal-calls');
+    const goEl=document.getElementById('k-goal-offers');
+    if(gcEl) gcEl.value=localStorage.getItem('sc2_goal_calls')||'35';
+    if(goEl) goEl.value=localStorage.getItem('sc2_goal_offers')||'5';
     c.style.display = 'block';
   } else {
     c.style.display = 'none';
@@ -446,34 +487,57 @@ async function fetchGHL(k){
 
 function processGHL({ops,contacts,convs}){
   const stages={};
-  let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0;
+  let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0,offers=0,responses=0,sentToBuyer=0;
+
   ops.forEach(o=>{
-    const stageName=o.stage?.name||o.pipelineStage||o.status||'Unknown';
-    const pipelineName=o.pipeline?.name||o.pipelineName||'';
-    const displayKey=pipelineName?pipelineName+' / '+stageName:stageName;
-    stages[displayKey]=(stages[displayKey]||0)+1;
-    const sl=stageName.toLowerCase();
-    const pl=pipelineName.toLowerCase();
-    // Tier 1 — Cash Cowboy/Cowgirl pipeline or Agent Nurture Tier 1
-    if(sl.includes('tier 1')||sl.includes('cash cow')||pl.includes('cash cow')) t1++;
-    // Contracts — Offer Pipeline
-    if(pl.includes('offer')||sl.includes('contract')||sl.includes('submitted')||sl.includes('offer')) cont++;
-    // Won deals
-    if(sl.includes('won')||sl.includes('closed')||sl.includes('close')){
+    // Try every possible field GHL might use for stage name
+    const stageName = o.stage?.name || o.stageName || o.pipelineStage || o.stageId || o.status || 'Open';
+    const pipelineName = o.pipeline?.name || o.pipelineName || o.pipelineId || '';
+    const displayKey = pipelineName ? pipelineName+' / '+stageName : stageName;
+    stages[displayKey] = (stages[displayKey]||0)+1;
+
+    const sl = stageName.toLowerCase();
+    const pl = pipelineName.toLowerCase();
+
+    // Cash Cowboy / Tier 1 hot leads
+    if(sl.includes('tier 1')||sl.includes('cash cow')||pl.includes('cash cow')||
+       sl.includes('hot')||sl.includes('deal alert')) t1++;
+
+    // Offers made — Offer Pipeline or offer stage
+    if(pl.includes('offer')||sl.includes('offer')||sl.includes('presented')) offers++;
+
+    // Contracts submitted
+    if(sl.includes('contract')||sl.includes('submitted')||sl.includes('executed')) cont++;
+
+    // Sent to buyer
+    if(sl.includes('buyer')||sl.includes('assigned')||sl.includes('sent to buyer')) sentToBuyer++;
+
+    // Won / closed
+    if(sl.includes('won')||sl.includes('closed')||sl.includes('close won')){
       won++;
-      revenue+=o.monetaryValue||o.value||0;
+      revenue += o.monetaryValue||o.value||0;
     }
   });
+
   contacts.forEach(c=>{
-    const t=(c.tags||[]).join(' ').toLowerCase();
-    const cl=(c.customFields||[]).map(f=>String(f.value||'')).join(' ').toLowerCase();
-    if(t.includes('opt')||t.includes('dnc')||t.includes('stop')||cl.includes('opt out')) opt++;
+    const t = (c.tags||[]).join(' ').toLowerCase();
+    if(t.includes('opt')||t.includes('dnc')||t.includes('stop')) opt++;
   });
-  // SMS — count from conversations
+
+  // SMS from conversations — total SMS threads + responses
   convs.forEach(c=>{
-    sms+=(c.lastMessageType==='SMS'||c.type==='SMS')?1:0;
+    if(c.type==='SMS'||c.lastMessageType==='SMS'||c.channel==='sms'){
+      sms++;
+      if(c.unreadCount===0 && c.lastMessageDirection==='inbound') responses++;
+    }
   });
-  return{stages,t1,cont,won,opt,revenue,leads:contacts.length,sms,lpc:won>0?Math.round(contacts.length/won):0,ops};
+
+  return{
+    stages, t1, cont, won, opt, revenue, offers, sentToBuyer, responses,
+    leads: contacts.length, sms, 
+    lpc: won>0 ? Math.round(contacts.length/won) : 0,
+    ops
+  };
 }
 
 async function fetchSheet(k){
@@ -616,6 +680,19 @@ async function refreshAll(){
     document.getElementById('v-done').textContent=fmt(v.done);
     document.getElementById('v-crate').textContent=fmtPct(v.connected,v.dialed)+' rate';
     document.getElementById('v-hrate').textContent=fmtPct(v.hangup,v.connected)+' of connected';
+    // Duplicate fields for new layout
+    if(document.getElementById('v-dialed2')) document.getElementById('v-dialed2').textContent=fmt(v.dialed);
+    if(document.getElementById('v-connected2')) document.getElementById('v-connected2').textContent=fmt(v.connected);
+    if(document.getElementById('v-crate2')) document.getElementById('v-crate2').textContent=fmtPct(v.connected,v.dialed)+' rate';
+    if(document.getElementById('v-dur2')) document.getElementById('v-dur2').textContent=v.avgDur>0?v.avgDur+'s':'—';
+    // Quality call goal (calls >30s)
+    const goalCalls=parseInt(localStorage.getItem('sc2_goal_calls')||'35');
+    const qualityCalls=v.done; // done = calls >=30s
+    if(document.getElementById('v-quality')) document.getElementById('v-quality').textContent=fmt(qualityCalls);
+    if(document.getElementById('goal-calls-disp')) document.getElementById('goal-calls-disp').textContent=goalCalls;
+    if(document.getElementById('v-quality-sub')) document.getElementById('v-quality-sub').textContent='goal: '+goalCalls+'/day · '+(qualityCalls>=goalCalls?'goal met!':qualityCalls+' of '+goalCalls+' done');
+    if(document.getElementById('goal-fill-calls')) document.getElementById('goal-fill-calls').style.width=Math.min(100,Math.round(qualityCalls/goalCalls*100))+'%';
+    if(document.getElementById('mc-quality')) document.getElementById('mc-quality').className='mcard '+(qualityCalls>=goalCalls?'green':qualityCalls>=goalCalls*0.6?'amber':'red');
     const hr=v.connected>0?v.hangup/v.connected:0;
     document.getElementById('mc-hang').className='mcard '+(hr>0.35?'red':hr>0.2?'amber':'green');
     const cr=v.dialed>0?v.connected/v.dialed:0;
@@ -631,10 +708,17 @@ async function refreshAll(){
     document.getElementById('g-leads').textContent=fmt(g.leads);
     document.getElementById('g-t1').textContent=fmt(g.t1);
     document.getElementById('g-cont').textContent=fmt(g.cont);
-    document.getElementById('g-won').textContent=fmt(g.won);
+    document.getElementById('g-won').textContent=fmt(g.won)+(g.sentToBuyer>0?' / '+fmt(g.sentToBuyer):'');
     document.getElementById('g-sms').textContent=fmt(g.sms);
-    document.getElementById('g-lpc').textContent=g.lpc>0?g.lpc+':1':'—';
+    document.getElementById('g-resp').textContent=fmt(g.responses);
+    document.getElementById('g-offers').textContent=fmt(g.offers);
     document.getElementById('g-opt').textContent=fmt(g.opt);
+    // Offers goal bar
+    const goalOffers=parseInt(localStorage.getItem('sc2_goal_offers')||'5');
+    document.getElementById('goal-offers-disp').textContent=goalOffers;
+    document.getElementById('g-offers-sub').textContent='goal: '+goalOffers+'/day · '+(g.offers>=goalOffers?'goal met!':g.offers+' of '+goalOffers+' done');
+    document.getElementById('goal-fill-offers').style.width=Math.min(100,Math.round(g.offers/goalOffers*100))+'%';
+    document.getElementById('mc-offers').className='mcard '+(g.offers>=goalOffers?'green':g.offers>=goalOffers*0.6?'amber':'red');
     document.getElementById('pl-rev').textContent=g.revenue>0?fmtMoney(g.revenue):'$0';
     updatePL();
     renderPipeline(g.stages);
