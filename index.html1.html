@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Seacoastal — KPI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0e0f11;
+  --surface:#16181c;
+  --surface2:#1e2126;
+  --surface3:#252a31;
+  --border:#2a2f38;
+  --text:#e8e9eb;
+  --muted:#7a8494;
+  --muted2:#4a5568;
+  --accent:#22c55e;
+  --accent2:#16a34a;
+  --gold:#f59e0b;
+  --red:#ef4444;
+  --redbg:#2d1515;
+  --green:#22c55e;
+  --greenbg:#0f2a1a;
+  --amber:#f59e0b;
+  --amberbg:#2a1f0a;
+  --blue:#3b82f6;
+  --bluebg:#0f1e35;
+  --purple:#a855f7;
+  --purplebg:#1e0f2a;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;min-height:100vh;}
+
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:0;display:flex;flex-direction:column;}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid var(--border);}
+.sidebar-logo .sl-name{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.2px;}
+.sidebar-logo .sl-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.sidebar-logo .sl-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:6px;}
+
+.nav{padding:12px 10px;flex:1;}
+.nav-section{font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;padding:8px 10px 4px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;color:var(--muted);font-size:12px;font-weight:500;margin-bottom:2px;transition:all 0.12s;}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:var(--surface3);color:var(--text);}
+.nav-item .ni-icon{width:16px;height:16px;border-radius:3px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;}
+.nav-item.active .ni-icon{background:var(--accent);color:#000;}
+
+.sidebar-bottom{padding:12px 10px;border-top:1px solid var(--border);}
+.sync-badge{background:var(--greenbg);color:var(--green);font-size:10px;font-weight:600;padding:4px 8px;border-radius:4px;border:1px solid var(--accent2);}
+
+.main{background:var(--bg);overflow-y:auto;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);}
+.topbar-left h2{font-size:16px;font-weight:600;color:var(--text);}
+.topbar-left p{font-size:11px;color:var(--muted);margin-top:1px;}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+
+.date-tabs{display:flex;background:var(--surface2);border-radius:6px;padding:3px;gap:2px;}
+.dt{padding:5px 12px;border-radius:4px;font-size:11px;font-weight:500;cursor:pointer;color:var(--muted);border:none;background:transparent;font-family:inherit;}
+.dt.active{background:var(--surface3);color:var(--text);}
+
+.btn{padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface2);color:var(--text);}
+.btn:hover{background:var(--surface3);}
+.btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;}
+.btn.primary:hover{background:var(--accent2);}
+.btn:disabled{opacity:0.4;cursor:default;}
+
+.content{padding:20px 24px;}
+
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px;}
+.setup-card h3{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.setup-card h3 .warn{background:var(--amberbg);color:var(--amber);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;border:1px solid var(--amber);}
+.keys-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.kf{display:flex;flex-direction:column;gap:4px;}
+.kf label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+.kf input{padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--surface2);color:var(--text);}
+.kf input:focus{outline:none;border-color:var(--accent);}
+.keys-note{font-size:11px;color:var(--muted);margin-top:8px;}
+
+.section-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;}
+
+.metric-row{display:grid;gap:10px;margin-bottom:16px;}
+.mg4{grid-template-columns:repeat(4,1fr);}
+.mg6{grid-template-columns:repeat(6,1fr);}
+.mg3{grid-template-columns:repeat(3,1fr);}
+
+.mcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;}
+.mcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border);}
+.mcard.green::before{background:var(--green);}
+.mcard.red::before{background:var(--red);}
+.mcard.amber::before{background:var(--amber);}
+.mcard.blue::before{background:var(--blue);}
+.mcard.purple::before{background:var(--purple);}
+.mc-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;}
+.mc-val{font-size:24px;font-weight:700;color:var(--text);letter-spacing:-0.5px;}
+.mc-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+.mc-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;margin-top:5px;}
+.mc-badge.up{background:var(--greenbg);color:var(--green);}
+.mc-badge.down{background:var(--redbg);color:var(--red);}
+.mc-badge.neutral{background:var(--surface2);color:var(--muted);}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.three-col{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:16px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.card-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-head h4{font-size:12px;font-weight:600;color:var(--text);}
+.card-head span{font-size:10px;color:var(--muted);}
+.card-body{padding:14px 16px;}
+
+.pipeline-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.pipeline-row:last-child{border-bottom:none;}
+.pr-name{color:var(--muted);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pr-bar-wrap{width:80px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;flex-shrink:0;}
+.pr-bar{height:100%;background:var(--accent);border-radius:3px;}
+.pr-count{font-weight:600;color:var(--text);min-width:20px;text-align:right;flex-shrink:0;}
+
+.deals-table{width:100%;border-collapse:collapse;font-size:12px;}
+.deals-table th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);padding:6px 10px;text-align:left;border-bottom:1px solid var(--border);}
+.deals-table td{padding:8px 10px;border-bottom:1px solid var(--border);}
+.deals-table tr:last-child td{border-bottom:none;}
+.deals-table .num{text-align:right;font-weight:500;}
+.stage-pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;}
+.stage-pill.hot{background:var(--greenbg);color:var(--green);}
+.stage-pill.warm{background:var(--amberbg);color:var(--amber);}
+.stage-pill.cold{background:var(--surface2);color:var(--muted);}
+.stage-pill.won{background:var(--bluebg);color:var(--blue);}
+
+.pl-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.pl-row:last-child{border-bottom:none;}
+.pl-label{color:var(--muted);}
+.pl-val{font-weight:500;color:var(--text);}
+.pl-total{display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;border-top:1px solid var(--border);margin-top:4px;}
+
+.err{font-size:11px;color:var(--red);background:var(--redbg);border:1px solid var(--red);border-radius:5px;padding:7px 10px;margin-bottom:10px;display:none;}
+
+@media(max-width:1000px){
+  .layout{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .mg6,.mg4{grid-template-columns:repeat(2,1fr);}
+  .mg3,.two-col,.three-col{grid-template-columns:1fr;}
+  .keys-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sl-name"><span class="sl-dot"></span>Seacoastal Home</div>
+    <div class="sl-sub">Jerry AI System</div>
+  </div>
+  <div class="nav">
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active"><div class="ni-icon">▣</div>Dashboard</div>
+    <div class="nav-item"><div class="ni-icon">↗</div>Calls</div>
+    <div class="nav-item"><div class="ni-icon">◎</div>Pipeline</div>
+    <div class="nav-section">Finance</div>
+    <div class="nav-item"><div class="ni-icon">$</div>P&amp;L</div>
+    <div class="nav-item"><div class="ni-icon">≡</div>Deals</div>
+    <div class="nav-section">Settings</div>
+    <div class="nav-item" onclick="toggleSetup()"><div class="ni-icon">⚙</div>API Keys</div>
+  </div>
+  <div class="sidebar-bottom">
+    <div class="sync-badge" id="sync-badge">● Not synced</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px;" id="sync-time">—</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2>KPI Dashboard</h2>
+      <p id="topbar-sub">Houston TX · Wholesale Operations</p>
+    </div>
+    <div class="topbar-right">
+      <div class="date-tabs">
+        <button class="dt active" onclick="setRange('today',this)">Today</button>
+        <button class="dt" onclick="setRange('week',this)">Week</button>
+        <button class="dt" onclick="setRange('month',this)">Month</button>
+        <button class="dt" onclick="setRange('all',this)">All time</button>
+      </div>
+      <button class="btn primary" id="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div id="err-vapi" class="err"></div>
+    <div id="err-ghl" class="err"></div>
+    <div id="err-sheet" class="err"></div>
+
+    <!-- SETUP -->
+    <div class="setup-card" id="setup-card">
+      <h3>API credentials <span class="warn">Setup required</span></h3>
+      <div class="keys-grid">
+        <div class="kf"><label>Vapi API Key</label><input id="k-vapi" type="password" placeholder="Bearer token from Vapi dashboard"/></div>
+        <div class="kf"><label>Vapi Assistant ID</label><input id="k-asst" type="text" placeholder="a7fa7099-cd71-4760-94a8-e4060a731d30"/></div>
+        <div class="kf"><label>GHL API Key</label><input id="k-ghl" type="password" placeholder="pit-08929567-ea77-4ffc-..."/></div>
+        <div class="kf"><label>GHL Location ID</label><input id="k-loc" type="text" placeholder="0KudMlNZlDTEfkIM0398"/></div>
+        <div class="kf"><label>Google Sheet ID</label><input id="k-sheet" type="text" placeholder="12blfKRjlCmfrBNjCdZ9YFarT0TxrITTvCNGK50RowD8"/></div>
+        <div class="kf"><label>Sheet tab name</label><input id="k-tab" type="text" placeholder="KPI Log"/></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn primary" onclick="saveKeys()">Save &amp; Connect</button>
+        <button class="btn" onclick="toggleSetup()">Dismiss</button>
+      </div>
+      <p class="keys-note">Saved in your browser only — never sent anywhere except directly to Vapi, GHL, and Google Sheets APIs.</p>
+    </div>
+
+    <!-- VAPI METRICS -->
+    <div class="section-label">Call performance</div>
+    <div class="metric-row mg6" style="margin-bottom:16px;">
+      <div class="mcard green"><div class="mc-label">Dialed</div><div class="mc-val" id="v-dialed">—</div><div class="mc-sub">outbound calls</div></div>
+      <div class="mcard" id="mc-conn"><div class="mc-label">Connected</div><div class="mc-val" id="v-connected">—</div><div class="mc-sub" id="v-crate">—% rate</div></div>
+      <div class="mcard" id="mc-hang"><div class="mc-label">Hung up &lt;10s</div><div class="mc-val" id="v-hangup">—</div><div class="mc-sub" id="v-hrate">—% of connected</div></div>
+      <div class="mcard blue"><div class="mc-label">Avg duration</div><div class="mc-val" id="v-dur">—</div><div class="mc-sub">seconds avg</div></div>
+      <div class="mcard amber"><div class="mc-label">Voicemails</div><div class="mc-val" id="v-vm">—</div><div class="mc-sub">drops today</div></div>
+      <div class="mcard purple"><div class="mc-label">Completed</div><div class="mc-val" id="v-done">—</div><div class="mc-sub">full convos</div></div>
+    </div>
+
+    <!-- GHL METRICS -->
+    <div class="section-label">Pipeline &amp; CRM</div>
+    <div class="metric-row mg4" style="margin-bottom:16px;">
+      <div class="mcard green"><div class="mc-label">Total leads</div><div class="mc-val" id="g-leads">—</div><div class="mc-sub">contacts in GHL</div></div>
+      <div class="mcard blue"><div class="mc-label">Tier 1 hot</div><div class="mc-val" id="g-t1">—</div><div class="mc-sub">deal alerts fired</div></div>
+      <div class="mcard amber"><div class="mc-label">Contracts</div><div class="mc-val" id="g-cont">—</div><div class="mc-sub">submitted</div></div>
+      <div class="mcard purple"><div class="mc-label">Won deals</div><div class="mc-val" id="g-won">—</div><div class="mc-sub">closed</div></div>
+    </div>
+    <div class="metric-row mg3" style="margin-bottom:20px;">
+      <div class="mcard"><div class="mc-label">SMS sent</div><div class="mc-val" id="g-sms">—</div><div class="mc-sub">total messages</div></div>
+      <div class="mcard"><div class="mc-label">Leads per close</div><div class="mc-val" id="g-lpc">—</div><div class="mc-sub">conversion ratio</div></div>
+      <div class="mcard red"><div class="mc-label">Opted out</div><div class="mc-val" id="g-opt">—</div><div class="mc-sub">DNC / STOP</div></div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-head"><h4>Weekly activity</h4><span>calls · last 8 weeks</span></div>
+        <div class="card-body">
+          <div style="position:relative;width:100%;height:200px;"><canvas id="weekly-chart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h4>Call outcomes</h4><span id="outcome-sub">today</span></div>
+        <div class="card-body">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:11px;color:var(--muted);">
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:#22c55e;"></span>Completed</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:#f59e0b;"></span>Voicemail</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:#ef4444;"></span>Hung up</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:#374151;"></span>No answer</span>
+          </div>
+          <div style="position:relative;width:100%;height:160px;"><canvas id="outcome-chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE + P&L -->
+    <div class="three-col">
+      <div class="card">
+        <div class="card-head"><h4>Pipeline by stage</h4><span>GHL contacts</span></div>
+        <div class="card-body">
+          <div id="pipeline-stages"><div class="pipeline-row"><span class="pr-name" style="color:var(--muted);font-style:italic;">Refresh to load</span></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h4>P&amp;L — monthly</h4><span>costs vs revenue</span></div>
+        <div class="card-body">
+          <div class="pl-row"><span class="pl-label">GHL</span><span class="pl-val">$297</span></div>
+          <div class="pl-row"><span class="pl-label">Vapi</span><span class="pl-val">~$varies</span></div>
+          <div class="pl-row"><span class="pl-label">n8n</span><span class="pl-val">$20</span></div>
+          <div class="pl-row"><span class="pl-label">BatchLeads</span><span class="pl-val">$127</span></div>
+          <div class="pl-row"><span class="pl-label">Twilio</span><span class="pl-val">~$varies</span></div>
+          <div class="pl-row"><span class="pl-label">RapidAPI</span><span class="pl-val">$50</span></div>
+          <div class="pl-row"><span class="pl-label">Anthropic</span><span class="pl-val">$20</span></div>
+          <div class="pl-total"><span style="color:var(--muted);">Fixed costs</span><span style="color:var(--red);">$514+</span></div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+            <div class="pl-row"><span class="pl-label">Revenue (won deals)</span><span class="pl-val" id="pl-rev" style="color:var(--green);">$0</span></div>
+            <div class="pl-row" style="border:none;"><span class="pl-label" style="font-weight:600;">Net P&amp;L</span><span class="pl-val" id="pl-net" style="font-weight:700;">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECENT DEALS -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-head"><h4>Recent deals</h4><span>contracts &amp; won from GHL</span></div>
+      <div class="card-body" style="padding:0;">
+        <table class="deals-table">
+          <thead><tr><th>Contact</th><th>Stage</th><th>Pipeline</th><th class="num">Value</th><th>Updated</th></tr></thead>
+          <tbody id="deals-tbody">
+            <tr><td colspan="5" style="padding:16px;color:var(--muted);font-style:italic;">Refresh to load deals</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- HISTORICAL FROM GOOGLE SHEET -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-head"><h4>Historical KPI log</h4><span>from Google Sheet · n8n nightly sync</span></div>
+      <div class="card-body">
+        <div style="position:relative;width:100%;height:220px;"><canvas id="history-chart"></canvas></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;" id="sheet-note">Connect your Google Sheet ID in API Keys to see historical data.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+let currentRange = 'today';
+let weeklyChartInst = null;
+let outcomeChartInst = null;
+let historyChartInst = null;
+
+function getKeys(){
+  return {
+    vapi:  localStorage.getItem('sc2_vapi')  || '',
+    asst:  localStorage.getItem('sc2_asst')  || 'a7fa7099-cd71-4760-94a8-e4060a731d30',
+    ghl:   localStorage.getItem('sc2_ghl')   || '',
+    loc:   localStorage.getItem('sc2_loc')   || '0KudMlNZlDTEfkIM0398',
+    sheet: localStorage.getItem('sc2_sheet') || '12blfKRjlCmfrBNjCdZ9YFarT0TxrITTvCNGK50RowD8',
+    tab:   localStorage.getItem('sc2_tab')   || 'KPI Log'
+  };
+}
+
+function saveKeys(){
+  ['vapi','asst','ghl','loc','sheet','tab'].forEach(k=>{
+    const el = document.getElementById('k-'+k);
+    if(el && el.value.trim()) localStorage.setItem('sc2_'+k, el.value.trim());
+  });
+  toggleSetup();
+  refreshAll();
+}
+
+function toggleSetup(){
+  const c = document.getElementById('setup-card');
+  const k = getKeys();
+  if(c.style.display === 'none'){
+    document.getElementById('k-vapi').value  = k.vapi;
+    document.getElementById('k-asst').value  = k.asst;
+    document.getElementById('k-ghl').value   = k.ghl;
+    document.getElementById('k-loc').value   = k.loc;
+    document.getElementById('k-sheet').value = k.sheet;
+    document.getElementById('k-tab').value   = k.tab;
+    c.style.display = 'block';
+  } else {
+    c.style.display = 'none';
+  }
+}
+
+function setRange(r, el){
+  currentRange = r;
+  document.querySelectorAll('.dt').forEach(d=>d.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('outcome-sub').textContent = r;
+  refreshAll();
+}
+
+function showErr(id,msg){ const e=document.getElementById(id); e.textContent=msg; e.style.display='block'; }
+function clearErr(id){ document.getElementById(id).style.display='none'; }
+function fmt(n){ return isNaN(n)||n===null?'—':Math.round(n).toLocaleString(); }
+function fmtMoney(n){ return '$'+Math.round(n).toLocaleString(); }
+function fmtPct(a,b){ return b>0?(a/b*100).toFixed(1)+'%':'0%'; }
+
+function getDateRange(){
+  const now = new Date();
+  const end = now.toISOString();
+  let start;
+  if(currentRange==='today'){
+    const s = new Date(now); s.setHours(0,0,0,0); start=s.toISOString();
+  } else if(currentRange==='week'){
+    const s = new Date(now); s.setDate(s.getDate()-7); start=s.toISOString();
+  } else if(currentRange==='month'){
+    const s = new Date(now); s.setDate(1); s.setHours(0,0,0,0); start=s.toISOString();
+  } else {
+    const s = new Date('2024-01-01'); start=s.toISOString();
+  }
+  return {start,end};
+}
+
+async function fetchVapi(k){
+  const {start,end} = getDateRange();
+  const url = `https://api.vapi.ai/call?assistantId=${k.asst}&createdAtGt=${encodeURIComponent(start)}&createdAtLt=${encodeURIComponent(end)}&limit=1000`;
+  const res = await fetch(url,{headers:{Authorization:'Bearer '+k.vapi}});
+  if(!res.ok) throw new Error('Vapi '+res.status);
+  const d = await res.json();
+  return Array.isArray(d)?d:(d.calls||d.data||[]);
+}
+
+function processVapi(calls){
+  let dialed=0,connected=0,hangup=0,vm=0,done=0,durSum=0,durN=0;
+  const weekBuckets=Array(8).fill(0);
+  const now=Date.now();
+  calls.forEach(c=>{
+    dialed++;
+    const dur=c.duration||c.durationSeconds||0;
+    const er=(c.endedReason||c.end_reason||'').toLowerCase();
+    if(dur>0){connected++;durSum+=dur;durN++;}
+    if(dur>0&&dur<10) hangup++;
+    if(er.includes('voicemail')||er.includes('vm')) vm++;
+    if(dur>=30) done++;
+    const created=new Date(c.createdAt||c.created_at||now).getTime();
+    const wa=Math.floor((now-created)/(7*24*3600*1000));
+    if(wa<8) weekBuckets[7-wa]++;
+  });
+  return{dialed,connected,hangup,vm,done,noAnswer:dialed-connected,
+    avgDur:durN>0?Math.round(durSum/durN):0,weekBuckets};
+}
+
+async function fetchGHL(k){
+  const headers={Authorization:'Bearer '+k.ghl,Version:'2021-07-28'};
+  const [opR,coR,cvR] = await Promise.all([
+    fetch(`https://services.leadconnectorhq.com/opportunities/search?location_id=${k.loc}&limit=100`,{headers}),
+    fetch(`https://services.leadconnectorhq.com/contacts/?locationId=${k.loc}&limit=100`,{headers}),
+    fetch(`https://services.leadconnectorhq.com/conversations/search?locationId=${k.loc}&limit=100`,{headers})
+  ]);
+  if(!opR.ok) throw new Error('GHL opportunities '+opR.status);
+  if(!coR.ok) throw new Error('GHL contacts '+coR.status);
+  const ops=await opR.json(); const cos=await coR.json(); const cvs=cvR.ok?await cvR.json():{conversations:[]};
+  return{ops:ops.opportunities||ops.data||[], contacts:cos.contacts||[], convs:cvs.conversations||[]};
+}
+
+function processGHL({ops,contacts,convs}){
+  const stages={};
+  let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0;
+  ops.forEach(o=>{
+    const s=o.stage?.name||o.pipelineStage||o.status||'Unknown';
+    stages[s]=(stages[s]||0)+1;
+    const sl=s.toLowerCase();
+    if(sl.includes('tier 1')||sl.includes('hot')||sl.includes('deal alert')) t1++;
+    if(sl.includes('contract')||sl.includes('submitted')||sl.includes('offer')) cont++;
+    if(sl.includes('won')||sl.includes('closed')){won++;revenue+=o.monetaryValue||o.value||0;}
+  });
+  contacts.forEach(c=>{
+    const t=(c.tags||[]).join(' ').toLowerCase();
+    if(t.includes('opt')||t.includes('dnc')||t.includes('stop')) opt++;
+  });
+  convs.forEach(c=>{sms+=c.unreadCount||0;});
+  return{stages,t1,cont,won,opt,revenue,leads:contacts.length,sms,lpc:won>0?Math.round(contacts.length/won):0,ops};
+}
+
+async function fetchSheet(k){
+  if(!k.sheet) return null;
+  const url=`https://docs.google.com/spreadsheets/d/${k.sheet}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(k.tab)}`;
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('Sheet '+res.status);
+  const text=await res.text();
+  const json=JSON.parse(text.replace(/^.*?({.*}).*$/s,'$1'));
+  return json.table;
+}
+
+function processSheet(table){
+  if(!table||!table.rows) return null;
+  const cols=table.cols.map(c=>c.label.toLowerCase());
+  const dateIdx=cols.findIndex(c=>c.includes('date'));
+  const dialedIdx=cols.findIndex(c=>c.includes('dialed'));
+  const connIdx=cols.findIndex(c=>c.includes('connect'));
+  const contractIdx=cols.findIndex(c=>c.includes('contract'));
+  const wonIdx=cols.findIndex(c=>c.includes('won')||c.includes('closed'));
+  const rows=table.rows.slice(-12);
+  return{
+    labels:rows.map(r=>r.c[dateIdx]?.v||''),
+    dialed:rows.map(r=>r.c[dialedIdx]?.v||0),
+    contracts:rows.map(r=>r.c[contractIdx]?.v||0),
+    won:rows.map(r=>r.c[wonIdx]?.v||0),
+  };
+}
+
+function renderWeekly(buckets){
+  const labels=[];
+  for(let i=7;i>=0;i--){
+    const d=new Date();d.setDate(d.getDate()-i*7);
+    labels.push(d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  }
+  if(weeklyChartInst) weeklyChartInst.destroy();
+  weeklyChartInst=new Chart(document.getElementById('weekly-chart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'Calls',data:buckets,backgroundColor:'#22c55e',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#7a8494',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#7a8494',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+}
+
+function renderOutcome(v){
+  if(outcomeChartInst) outcomeChartInst.destroy();
+  outcomeChartInst=new Chart(document.getElementById('outcome-chart'),{
+    type:'doughnut',
+    data:{
+      labels:['Completed','Voicemail','Hung up','No answer'],
+      datasets:[{data:[v.done,v.vm,v.hangup,v.noAnswer],
+        backgroundColor:['#22c55e','#f59e0b','#ef4444','#374151'],borderWidth:0}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},cutout:'68%'}
+  });
+}
+
+function renderHistory(data){
+  if(!data){document.getElementById('sheet-note').textContent='No data from Google Sheet — check Sheet ID and make sure it is shared publicly (view only).';return;}
+  document.getElementById('sheet-note').textContent='Historical data from Google Sheet · last '+data.labels.length+' entries';
+  if(historyChartInst) historyChartInst.destroy();
+  historyChartInst=new Chart(document.getElementById('history-chart'),{
+    type:'line',
+    data:{
+      labels:data.labels,
+      datasets:[
+        {label:'Calls dialed',data:data.dialed,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.08)',tension:0.3,fill:true,pointRadius:3},
+        {label:'Contracts',data:data.contracts,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.08)',tension:0.3,fill:true,pointRadius:3},
+        {label:'Won',data:data.won,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.08)',tension:0.3,fill:true,pointRadius:3},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#7a8494',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#7a8494',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+}
+
+function renderPipeline(stages){
+  const el=document.getElementById('pipeline-stages');
+  const entries=Object.entries(stages).sort((a,b)=>b[1]-a[1]);
+  const max=Math.max(...entries.map(e=>e[1]),1);
+  el.innerHTML=entries.map(([name,count])=>`
+    <div class="pipeline-row">
+      <span class="pr-name">${name}</span>
+      <div class="pr-bar-wrap"><div class="pr-bar" style="width:${Math.round(count/max*100)}%"></div></div>
+      <span class="pr-count">${count}</span>
+    </div>`).join('')||'<div class="pipeline-row"><span class="pr-name" style="color:var(--muted)">No pipeline data</span></div>';
+}
+
+function renderDeals(ops){
+  const filtered=(ops||[]).filter(o=>{
+    const s=(o.stage?.name||o.status||'').toLowerCase();
+    return s.includes('contract')||s.includes('won')||s.includes('tier 1')||s.includes('offer')||s.includes('hot');
+  }).slice(0,10);
+  const tbody=document.getElementById('deals-tbody');
+  if(!filtered.length){tbody.innerHTML='<tr><td colspan="5" style="padding:16px;color:var(--muted);font-style:italic;">No recent deals</td></tr>';return;}
+  tbody.innerHTML=filtered.map(o=>{
+    const stage=o.stage?.name||o.status||'—';
+    const sl=stage.toLowerCase();
+    const cls=sl.includes('won')?'won':sl.includes('tier 1')||sl.includes('hot')?'hot':sl.includes('contract')?'warm':'cold';
+    const val=o.monetaryValue||o.value||0;
+    const name=o.contact?.name||o.contactName||'—';
+    const pipeline=o.pipeline?.name||'—';
+    const updated=o.updatedAt?new Date(o.updatedAt).toLocaleDateString():'—';
+    return`<tr>
+      <td>${name}</td>
+      <td><span class="stage-pill ${cls}">${stage}</span></td>
+      <td>${pipeline}</td>
+      <td class="num">${val>0?fmtMoney(val):'—'}</td>
+      <td>${updated}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function refreshAll(){
+  const k=getKeys();
+  const btn=document.getElementById('refresh-btn');
+  btn.disabled=true;btn.textContent='↻ Loading...';
+  clearErr('err-vapi');clearErr('err-ghl');clearErr('err-sheet');
+
+  // VAPI
+  try{
+    const calls=await fetchVapi(k);
+    const v=processVapi(calls);
+    document.getElementById('v-dialed').textContent=fmt(v.dialed);
+    document.getElementById('v-connected').textContent=fmt(v.connected);
+    document.getElementById('v-hangup').textContent=fmt(v.hangup);
+    document.getElementById('v-dur').textContent=v.avgDur>0?v.avgDur+'s':'—';
+    document.getElementById('v-vm').textContent=fmt(v.vm);
+    document.getElementById('v-done').textContent=fmt(v.done);
+    document.getElementById('v-crate').textContent=fmtPct(v.connected,v.dialed)+' rate';
+    document.getElementById('v-hrate').textContent=fmtPct(v.hangup,v.connected)+' of connected';
+    const hr=v.connected>0?v.hangup/v.connected:0;
+    document.getElementById('mc-hang').className='mcard '+(hr>0.35?'red':hr>0.2?'amber':'green');
+    const cr=v.dialed>0?v.connected/v.dialed:0;
+    document.getElementById('mc-conn').className='mcard '+(cr>0.5?'green':cr>0.25?'amber':'red');
+    renderWeekly(v.weekBuckets);
+    renderOutcome(v);
+  }catch(e){showErr('err-vapi','Vapi error: '+e.message+' — verify your Vapi API key.');}
+
+  // GHL
+  try{
+    const raw=await fetchGHL(k);
+    const g=processGHL(raw);
+    document.getElementById('g-leads').textContent=fmt(g.leads);
+    document.getElementById('g-t1').textContent=fmt(g.t1);
+    document.getElementById('g-cont').textContent=fmt(g.cont);
+    document.getElementById('g-won').textContent=fmt(g.won);
+    document.getElementById('g-sms').textContent=fmt(g.sms);
+    document.getElementById('g-lpc').textContent=g.lpc>0?g.lpc+':1':'—';
+    document.getElementById('g-opt').textContent=fmt(g.opt);
+    document.getElementById('pl-rev').textContent=g.revenue>0?fmtMoney(g.revenue):'$0';
+    const net=g.revenue-514;
+    const netEl=document.getElementById('pl-net');
+    netEl.textContent=fmtMoney(net);
+    netEl.style.color=net>=0?'var(--green)':'var(--red)';
+    renderPipeline(g.stages);
+    renderDeals(g.ops);
+  }catch(e){showErr('err-ghl','GHL error: '+e.message+' — verify your GHL API key.');}
+
+  // GOOGLE SHEET
+  try{
+    const table=await fetchSheet(k);
+    const data=processSheet(table);
+    renderHistory(data);
+  }catch(e){
+    showErr('err-sheet','Google Sheet error: '+e.message+' — make sure the sheet is shared as "Anyone with link can view".');
+    renderHistory(null);
+  }
+
+  const now=new Date();
+  document.getElementById('sync-badge').textContent='● Live';
+  document.getElementById('sync-badge').style.background='var(--greenbg)';
+  document.getElementById('sync-badge').style.color='var(--green)';
+  document.getElementById('sync-time').textContent='Synced '+now.toLocaleTimeString();
+  document.getElementById('topbar-sub').textContent='Houston TX · '+currentRange+' · '+now.toLocaleDateString();
+  btn.disabled=false;btn.textContent='↻ Refresh';
+
+  if(k.vapi&&k.ghl) document.getElementById('setup-card').style.display='none';
+}
+
+window.addEventListener('load',()=>{
+  const k=getKeys();
+  if(k.vapi&&k.ghl){ document.getElementById('setup-card').style.display='none'; refreshAll(); }
+});
+</script>
+</body>
+</html>
