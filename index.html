@@ -192,7 +192,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
   <div class="content">
 
     <div id="err-vapi" class="err"></div>
-    <div id="vapi-debug" style="display:none;background:var(--surface);border:1px solid var(--amber);border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px;"></div>
     <div id="err-ghl" class="err"></div>
     <div id="err-sheet" class="err"></div>
 
@@ -455,7 +454,6 @@ async function fetchVapi(k){
     const calls = Array.isArray(d)?d:(d.calls||d.data||[]);
     if(!calls.length) break;
     allCalls = allCalls.concat(calls);
-    window._vapiRaw = allCalls;
     if(calls.length < 100) break;
     lastCreatedAt = calls[calls.length-1].createdAt;
   }
@@ -470,32 +468,33 @@ function processVapi(calls){
   calls.forEach(c=>{
     dialed++;
 
-    // Vapi has NO durationSeconds field — calculate from startedAt/endedAt
+    // Duration — confirmed: NO durationSeconds field in Vapi
+    // Must calculate from endedAt - startedAt
     let dur = 0;
     if(c.startedAt && c.endedAt){
       dur = Math.max(0,(new Date(c.endedAt).getTime()-new Date(c.startedAt).getTime())/1000);
     }
 
-    // endedReason confirmed field name from Vapi docs
+    // endedReason uses dashes: "assistant-ended-call", "customer-ended-call", "no-answer"
     const er = (c.endedReason||'').toLowerCase();
 
-    // Connected = call started (has startedAt)
+    // Connected = has startedAt timestamp (call was picked up)
     if(c.startedAt){
       connected++;
       if(dur>0){ durSum+=dur; durN++; }
     }
 
-    // Hung up early = answered but under 10 seconds
-    if(dur>0 && dur<10) hangup++;
+    // Hung up early — answered but under 10s
+    if(c.startedAt && dur>0 && dur<10) hangup++;
 
-    // Voicemail end reasons from Vapi
-    if(er==='voicemail'||er==='no-answer'||er==='customer-did-not-answer'||
-       er.includes('voicemail')||er.includes('no-answer')) vm++;
+    // Voicemail / no answer
+    if(er==='no-answer'||er==='voicemail'||er==='customer-did-not-answer'||
+       er.includes('no-answer')||er.includes('voicemail')) vm++;
 
-    // Quality call = 30+ seconds conversation
+    // Quality call = 30+ seconds
     if(dur>=30) done++;
 
-    // Week bucket — use createdAt (confirmed Vapi field)
+    // Week bucket using createdAt (confirmed field)
     const ts = new Date(c.createdAt||c.startedAt||now).getTime();
     const wa = Math.floor((now-ts)/(7*24*3600*1000));
     if(wa>=0 && wa<8) weekBuckets[7-wa]++;
@@ -750,25 +749,6 @@ async function refreshAll(){
     renderWeekly(v.weekBuckets);
     renderOutcome(v);
 
-    // DEBUG panel — shows raw first call so we can see field names
-    const dbg = document.getElementById('vapi-debug');
-    if(dbg && window._vapiRaw && window._vapiRaw.length>0){
-      const sample = window._vapiRaw[0];
-      dbg.style.display='block';
-      dbg.innerHTML = '<strong style="color:var(--amber)">Vapi debug — first call object:</strong><br><pre style="font-size:10px;color:var(--muted);white-space:pre-wrap;word-break:break-all;">'+
-        JSON.stringify({
-          id: sample.id,
-          type: sample.type,
-          status: sample.status,
-          endedReason: sample.endedReason,
-          createdAt: sample.createdAt,
-          startedAt: sample.startedAt,
-          endedAt: sample.endedAt,
-          duration: sample.duration,
-          durationSeconds: sample.durationSeconds,
-          cost: sample.cost
-        }, null, 2)+'</pre>';
-    }
   }catch(e){showErr('err-vapi','Vapi error: '+e.message+' — verify your Vapi API key.');}
 
   // GHL
