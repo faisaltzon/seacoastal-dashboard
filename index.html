@@ -540,45 +540,50 @@ function processGHL({ops,contacts,convs}){
   // monetaryValue: number
 
   ops.forEach(o=>{
-    // Status is the only stage indicator — use it + tags
     const status = (o.status||'open').toLowerCase();
-    const contactTags = (o.contact?.tags||[]).map(t=>t.toLowerCase());
-    const allTags = contactTags.join(' ');
+    // Tags are on the OPPORTUNITY object directly: o.tags — confirmed from API
+    const oppTags = (o.tags||[]).map(t=>String(t).toLowerCase());
+    const allTags = oppTags.join(' ');
 
-    // Display key for pipeline chart
-    let displayKey = status.charAt(0).toUpperCase()+status.slice(1);
+    // Pipeline chart display
+    let displayKey = 'Open';
     if(allTags.includes('tier 1')) displayKey = 'Tier 1 — Hot';
     else if(allTags.includes('tier 2')) displayKey = 'Tier 2 — Warm';
     else if(allTags.includes('tier 3')) displayKey = 'Tier 3 — Cold';
+    else if(allTags.includes('offer')) displayKey = 'Offer Made';
+    else if(allTags.includes('contract')) displayKey = 'Contract';
     else if(status==='won') displayKey = 'Won / Closed';
     else if(status==='lost') displayKey = 'Lost';
     stages[displayKey] = (stages[displayKey]||0)+1;
 
-    // Tier 1 = tag "tier 1" on contact
+    // Tier 1 hot
     if(allTags.includes('tier 1')) t1++;
 
-    // Offers = tag "offer" or status contains offer
-    if(allTags.includes('offer')||allTags.includes('offer made')||
-       status.includes('offer')) offers++;
+    // Offers made
+    if(allTags.includes('offer')) offers++;
 
-    // Contracts = tag "contract" or "executed"
-    if(allTags.includes('contract')||allTags.includes('executed')||
-       status.includes('contract')) cont++;
+    // Contracts signed
+    if(allTags.includes('contract')||allTags.includes('executed')) cont++;
 
     // Sent to buyer
-    if(allTags.includes('buyer')||allTags.includes('sent to buyer')||
-       status.includes('sent')) sentToBuyer++;
+    if(allTags.includes('buyer')||allTags.includes('sent to buyer')) sentToBuyer++;
 
-    // Won
+    // Won / closed
     if(status==='won'||allTags.includes('won')||allTags.includes('closed')){
       won++;
       revenue += o.monetaryValue||0;
     }
   });
 
+  // opted out — check both contacts and opportunity tags
   contacts.forEach(c=>{
     const t = (c.tags||[]).join(' ').toLowerCase();
     if(t.includes('opt')||t.includes('dnc')||t.includes('stop')) opt++;
+  });
+  // also check opportunity tags for opted out
+  ops.forEach(o=>{
+    const t = (o.tags||[]).join(' ').toLowerCase();
+    if(t.includes('opt out')||t.includes('opted out')||t.includes('dnc')) opt++;
   });
 
   // SMS from conversations
