@@ -517,16 +517,14 @@ async function fetchAllGHL(url, headers, key){
 async function fetchGHL(k){
   const headers={Authorization:'Bearer '+k.ghl,Version:'2021-07-28'};
 
-  // Fetch ops, contacts, and conversations in parallel
-  const [ops, contacts, cvR] = await Promise.all([
+  const [ops, contacts, convs] = await Promise.all([
     fetchAllGHL('https://services.leadconnectorhq.com/opportunities/search?location_id='+k.loc, headers, 'opportunities'),
     fetchAllGHL('https://services.leadconnectorhq.com/contacts/?locationId='+k.loc, headers, 'contacts'),
-    fetch('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc+'&limit=100', {headers})
+    fetchAllGHL('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc, headers, 'conversations')
   ]);
 
   if(!contacts.length) throw new Error('GHL contacts empty — check API key');
-  const cvs = cvR.ok ? (await cvR.json()).conversations||[] : [];
-  return{ops, contacts, convs:cvs};
+  return{ops, contacts, convs};
 }
 
 function processGHL({ops,contacts,convs}){
@@ -574,14 +572,17 @@ function processGHL({ops,contacts,convs}){
   });
 
   // SMS from conversations
-  // Confirmed field names: lastMessageType:"TYPE_SMS", lastMessageDirection:"inbound"/"outbound"
+  // Confirmed: lastMessageType:"TYPE_SMS", lastMessageDirection:"inbound"/"outbound"
+  let smsSent=0, smsResponses=0;
   convs.forEach(c=>{
     const msgType = (c.lastMessageType||'').toUpperCase();
-    if(msgType === 'TYPE_SMS' || msgType.includes('SMS')){
-      sms++;
-      if((c.lastMessageDirection||'').toLowerCase() === 'inbound') responses++;
+    if(msgType.includes('SMS')){
+      smsSent++;
+      if((c.lastMessageDirection||'').toLowerCase()==='inbound') smsResponses++;
     }
   });
+  sms = smsSent;
+  responses = smsResponses;
 
   return{
     stages, t1, cont, won, opt, revenue, offers, sentToBuyer, responses,
