@@ -518,77 +518,77 @@ async function fetchAllGHL(url, headers, key){
 
 async function fetchGHL(k){
   const headers={Authorization:'Bearer '+k.ghl,Version:'2021-07-28'};
+  const {start, end} = getDateRange();
+
+  // Convert ISO to epoch ms for GHL date filters
+  const startMs = new Date(start).getTime();
+  const endMs   = new Date(end).getTime();
 
   const [ops, contacts, convs] = await Promise.all([
-    fetchAllGHL('https://services.leadconnectorhq.com/opportunities/search?location_id='+k.loc, headers, 'opportunities'),
+    // Opportunities support date filter via createdAt
+    fetchAllGHL('https://services.leadconnectorhq.com/opportunities/search?location_id='+k.loc
+      +'&startAfter='+startMs+'&startBefore='+endMs, headers, 'opportunities'),
+    // Contacts — no reliable date filter, always all-time for lead count
     fetchAllGHL('https://services.leadconnectorhq.com/contacts/?locationId='+k.loc, headers, 'contacts'),
-    fetchAllGHL('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc, headers, 'conversations')
+    // Conversations with date filter
+    fetchAllGHL('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc
+      +'&startAfterDate='+startMs+'&startBeforeDate='+endMs, headers, 'conversations')
   ]);
 
   if(!contacts.length) throw new Error('GHL contacts empty — check API key');
-  return{ops, contacts, convs};
+  return{ops, contacts, convs, startMs, endMs};
 }
 
-function processGHL({ops,contacts,convs}){
+function processGHL({ops,contacts,convs,startMs,endMs}){
   const stages={};
-  let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0,offers=0,responses=0,sentToBuyer=0,jerryCalls=0;
+  let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0,offers=0,responses=0,sentToBuyer=0;
 
-  // CONFIRMED from API:
-  // Tags are on CONTACT objects: ["tier 1"], ["tier 2"], ["tier 3"], ["jerry call"]
-  // Opportunities have: status:"open", pipelineStageId (no names, no tags)
-  // Must read contact tags for tier/offer/contract info
-
-  // Build contact tag lookup map by contactId
+  // Build contact tag lookup: contactId -> tag string
   const contactTagMap = {};
   contacts.forEach(c=>{
     const tags = (c.tags||[]).map(t=>String(t).toLowerCase());
     contactTagMap[c.id] = tags.join(' ');
-    // Count from contacts directly
-    const t = tags.join(' ');
-    if(t.includes('tier 1')) t1++;
-    if(t.includes('offer')) offers++;
-    if(t.includes('contract')||t.includes('executed')) cont++;
-    if(t.includes('buyer')||t.includes('sent to buyer')) sentToBuyer++;
-    if(t.includes('won')||t.includes('closed')) { won++; }
-    if(t.includes('opt')||t.includes('dnc')||t.includes('stop')) opt++;
-    if(t.includes('jerry call')) jerryCalls++;
   });
 
-  // Pipeline stages from opportunities using contact tag lookup
+  // Count tiers from contacts — tags persist all-time
+  contacts.forEach(c=>{
+    const t = (c.tags||[]).join(' ').toLowerCase();
+    if(t.includes('tier 1')) t1++;
+    if(t.includes('offer made')||t.includes('offer sent')||t.includes('offer')) offers++;
+    if(t.includes('contract')||t.includes('executed')) cont++;
+    if(t.includes('sent to buyer')) sentToBuyer++;
+    if(t.includes('won')||t.includes('closed won')) won++;
+    if(t.includes('opt out')||t.includes('dnc')||t.includes('stop')) opt++;
+  });
+
+  // Pipeline stages from opportunities
   ops.forEach(o=>{
     const status = (o.status||'open').toLowerCase();
     const contactId = o.contactId||o.contact?.id;
     const cTags = contactId ? (contactTagMap[contactId]||'') : '';
-
     let displayKey = 'Open';
     if(cTags.includes('tier 1')) displayKey = 'Tier 1 — Hot';
     else if(cTags.includes('tier 2')) displayKey = 'Tier 2 — Warm';
     else if(cTags.includes('tier 3')) displayKey = 'Tier 3 — Cold';
-    else if(cTags.includes('offer')) displayKey = 'Offer Made';
-    else if(cTags.includes('contract')) displayKey = 'Contract';
-    else if(status==='won') displayKey = 'Won / Closed';
+    else if(status==='won') displayKey = 'Won';
     else if(status==='lost') displayKey = 'Lost';
     stages[displayKey] = (stages[displayKey]||0)+1;
-
-    if(status==='won') { won++; revenue += o.monetaryValue||0; }
+    if(status==='won'){ revenue += o.monetaryValue||0; }
   });
 
-  // SMS from conversations
-  // Confirmed: lastMessageType:"TYPE_SMS", lastMessageDirection:"inbound"/"outbound"
-  let smsSent=0, smsResponses=0;
+  // SMS counting — one conversation thread = one contact
+  // lastMessageType TYPE_SMS confirmed from API
   convs.forEach(c=>{
     const msgType = (c.lastMessageType||'').toUpperCase();
     if(msgType.includes('SMS')){
-      smsSent++;
-      if((c.lastMessageDirection||'').toLowerCase()==='inbound') smsResponses++;
+      sms++;
+      if((c.lastMessageDirection||'').toLowerCase()==='inbound') responses++;
     }
   });
-  sms = smsSent;
-  responses = smsResponses;
 
   return{
     stages, t1, cont, won, opt, revenue, offers, sentToBuyer, responses,
-    leads: contacts.length, sms, jerryCalls,
+    leads: contacts.length, sms,
     lpc: won>0 ? Math.round(contacts.length/won) : 0,
     ops
   };
