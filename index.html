@@ -502,7 +502,7 @@ function processVapi(calls){
 
 async function fetchAllGHL(url, headers, key){
   let all=[], page=1;
-  while(page<=10){
+  while(page<=20){
     const r=await fetch(url+'&page='+page+'&limit=100',{headers});
     if(!r.ok) break;
     const d=await r.json();
@@ -516,47 +516,63 @@ async function fetchAllGHL(url, headers, key){
 
 async function fetchGHL(k){
   const headers={Authorization:'Bearer '+k.ghl,Version:'2021-07-28'};
-  const [ops,contacts,cvR]=await Promise.all([
+
+  // Fetch ops, contacts, and conversations in parallel
+  const [ops, contacts, cvR] = await Promise.all([
     fetchAllGHL('https://services.leadconnectorhq.com/opportunities/search?location_id='+k.loc, headers, 'opportunities'),
     fetchAllGHL('https://services.leadconnectorhq.com/contacts/?locationId='+k.loc, headers, 'contacts'),
-    fetch('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc+'&limit=100',{headers})
+    fetch('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc+'&limit=100&type=SMS', {headers})
   ]);
-  if(!contacts.length) throw new Error('GHL contacts empty - check API key');
-  const cvs=cvR.ok?(await cvR.json()).conversations||[]:[];
-  return{ops,contacts,convs:cvs};
+
+  if(!contacts.length) throw new Error('GHL contacts empty — check API key');
+  const cvs = cvR.ok ? (await cvR.json()).conversations||[] : [];
+  return{ops, contacts, convs:cvs};
 }
 
 function processGHL({ops,contacts,convs}){
   const stages={};
   let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0,offers=0,responses=0,sentToBuyer=0;
 
+  // GHL confirmed fields from API:
+  // status: "open" (not stage name)
+  // pipelineId, pipelineStageId (IDs only, no names)
+  // tags on contact object: ["tier 1"], ["tier 2"], ["tier 3"]
+  // monetaryValue: number
+
   ops.forEach(o=>{
-    // Try every possible field GHL might use for stage name
-    const stageName = o.stage?.name || o.stageName || o.pipelineStage || o.stageId || o.status || 'Open';
-    const pipelineName = o.pipeline?.name || o.pipelineName || o.pipelineId || '';
-    const displayKey = pipelineName ? pipelineName+' / '+stageName : stageName;
+    // Status is the only stage indicator — use it + tags
+    const status = (o.status||'open').toLowerCase();
+    const contactTags = (o.contact?.tags||[]).map(t=>t.toLowerCase());
+    const allTags = contactTags.join(' ');
+
+    // Display key for pipeline chart
+    let displayKey = status.charAt(0).toUpperCase()+status.slice(1);
+    if(allTags.includes('tier 1')) displayKey = 'Tier 1 — Hot';
+    else if(allTags.includes('tier 2')) displayKey = 'Tier 2 — Warm';
+    else if(allTags.includes('tier 3')) displayKey = 'Tier 3 — Cold';
+    else if(status==='won') displayKey = 'Won / Closed';
+    else if(status==='lost') displayKey = 'Lost';
     stages[displayKey] = (stages[displayKey]||0)+1;
 
-    const sl = stageName.toLowerCase();
-    const pl = pipelineName.toLowerCase();
+    // Tier 1 = tag "tier 1" on contact
+    if(allTags.includes('tier 1')) t1++;
 
-    // Cash Cowboy / Tier 1 hot leads
-    if(sl.includes('tier 1')||sl.includes('cash cow')||pl.includes('cash cow')||
-       sl.includes('hot')||sl.includes('deal alert')) t1++;
+    // Offers = tag "offer" or status contains offer
+    if(allTags.includes('offer')||allTags.includes('offer made')||
+       status.includes('offer')) offers++;
 
-    // Offers made — Offer Pipeline or offer stage
-    if(pl.includes('offer')||sl.includes('offer')||sl.includes('presented')) offers++;
-
-    // Contracts submitted
-    if(sl.includes('contract')||sl.includes('submitted')||sl.includes('executed')) cont++;
+    // Contracts = tag "contract" or "executed"
+    if(allTags.includes('contract')||allTags.includes('executed')||
+       status.includes('contract')) cont++;
 
     // Sent to buyer
-    if(sl.includes('buyer')||sl.includes('assigned')||sl.includes('sent to buyer')) sentToBuyer++;
+    if(allTags.includes('buyer')||allTags.includes('sent to buyer')||
+       status.includes('sent')) sentToBuyer++;
 
-    // Won / closed
-    if(sl.includes('won')||sl.includes('closed')||sl.includes('close won')){
+    // Won
+    if(status==='won'||allTags.includes('won')||allTags.includes('closed')){
       won++;
-      revenue += o.monetaryValue||o.value||0;
+      revenue += o.monetaryValue||0;
     }
   });
 
@@ -565,17 +581,18 @@ function processGHL({ops,contacts,convs}){
     if(t.includes('opt')||t.includes('dnc')||t.includes('stop')) opt++;
   });
 
-  // SMS from conversations — total SMS threads + responses
+  // SMS from conversations
   convs.forEach(c=>{
-    if(c.type==='SMS'||c.lastMessageType==='SMS'||c.channel==='sms'){
+    const type=(c.type||c.lastMessageType||c.channel||'').toLowerCase();
+    if(type.includes('sms')||type.includes('text')){
       sms++;
-      if(c.unreadCount===0 && c.lastMessageDirection==='inbound') responses++;
+      if((c.lastMessageDirection||'').toLowerCase()==='inbound') responses++;
     }
   });
 
   return{
     stages, t1, cont, won, opt, revenue, offers, sentToBuyer, responses,
-    leads: contacts.length, sms, 
+    leads: contacts.length, sms,
     lpc: won>0 ? Math.round(contacts.length/won) : 0,
     ops
   };
