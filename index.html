@@ -521,7 +521,7 @@ async function fetchGHL(k){
   const [ops, contacts, cvR] = await Promise.all([
     fetchAllGHL('https://services.leadconnectorhq.com/opportunities/search?location_id='+k.loc, headers, 'opportunities'),
     fetchAllGHL('https://services.leadconnectorhq.com/contacts/?locationId='+k.loc, headers, 'contacts'),
-    fetch('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc+'&limit=100&type=SMS', {headers})
+    fetch('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc+'&limit=100', {headers})
   ]);
 
   if(!contacts.length) throw new Error('GHL contacts empty — check API key');
@@ -574,11 +574,12 @@ function processGHL({ops,contacts,convs}){
   });
 
   // SMS from conversations
+  // Confirmed field names: lastMessageType:"TYPE_SMS", lastMessageDirection:"inbound"/"outbound"
   convs.forEach(c=>{
-    const type=(c.type||c.lastMessageType||c.channel||'').toLowerCase();
-    if(type.includes('sms')||type.includes('text')){
+    const msgType = (c.lastMessageType||'').toUpperCase();
+    if(msgType === 'TYPE_SMS' || msgType.includes('SMS')){
       sms++;
-      if((c.lastMessageDirection||'').toLowerCase()==='inbound') responses++;
+      if((c.lastMessageDirection||'').toLowerCase() === 'inbound') responses++;
     }
   });
 
