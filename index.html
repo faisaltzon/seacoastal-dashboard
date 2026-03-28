@@ -531,59 +531,46 @@ async function fetchGHL(k){
 
 function processGHL({ops,contacts,convs}){
   const stages={};
-  let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0,offers=0,responses=0,sentToBuyer=0;
+  let t1=0,cont=0,won=0,opt=0,revenue=0,sms=0,offers=0,responses=0,sentToBuyer=0,jerryCalls=0;
 
-  // GHL confirmed fields from API:
-  // status: "open" (not stage name)
-  // pipelineId, pipelineStageId (IDs only, no names)
-  // tags on contact object: ["tier 1"], ["tier 2"], ["tier 3"]
-  // monetaryValue: number
+  // CONFIRMED from API:
+  // Tags are on CONTACT objects: ["tier 1"], ["tier 2"], ["tier 3"], ["jerry call"]
+  // Opportunities have: status:"open", pipelineStageId (no names, no tags)
+  // Must read contact tags for tier/offer/contract info
 
+  // Build contact tag lookup map by contactId
+  const contactTagMap = {};
+  contacts.forEach(c=>{
+    const tags = (c.tags||[]).map(t=>String(t).toLowerCase());
+    contactTagMap[c.id] = tags.join(' ');
+    // Count from contacts directly
+    const t = tags.join(' ');
+    if(t.includes('tier 1')) t1++;
+    if(t.includes('offer')) offers++;
+    if(t.includes('contract')||t.includes('executed')) cont++;
+    if(t.includes('buyer')||t.includes('sent to buyer')) sentToBuyer++;
+    if(t.includes('won')||t.includes('closed')) { won++; }
+    if(t.includes('opt')||t.includes('dnc')||t.includes('stop')) opt++;
+    if(t.includes('jerry call')) jerryCalls++;
+  });
+
+  // Pipeline stages from opportunities using contact tag lookup
   ops.forEach(o=>{
     const status = (o.status||'open').toLowerCase();
-    // Tags are on the OPPORTUNITY object directly: o.tags — confirmed from API
-    const oppTags = (o.tags||[]).map(t=>String(t).toLowerCase());
-    const allTags = oppTags.join(' ');
+    const contactId = o.contactId||o.contact?.id;
+    const cTags = contactId ? (contactTagMap[contactId]||'') : '';
 
-    // Pipeline chart display
     let displayKey = 'Open';
-    if(allTags.includes('tier 1')) displayKey = 'Tier 1 — Hot';
-    else if(allTags.includes('tier 2')) displayKey = 'Tier 2 — Warm';
-    else if(allTags.includes('tier 3')) displayKey = 'Tier 3 — Cold';
-    else if(allTags.includes('offer')) displayKey = 'Offer Made';
-    else if(allTags.includes('contract')) displayKey = 'Contract';
+    if(cTags.includes('tier 1')) displayKey = 'Tier 1 — Hot';
+    else if(cTags.includes('tier 2')) displayKey = 'Tier 2 — Warm';
+    else if(cTags.includes('tier 3')) displayKey = 'Tier 3 — Cold';
+    else if(cTags.includes('offer')) displayKey = 'Offer Made';
+    else if(cTags.includes('contract')) displayKey = 'Contract';
     else if(status==='won') displayKey = 'Won / Closed';
     else if(status==='lost') displayKey = 'Lost';
     stages[displayKey] = (stages[displayKey]||0)+1;
 
-    // Tier 1 hot
-    if(allTags.includes('tier 1')) t1++;
-
-    // Offers made
-    if(allTags.includes('offer')) offers++;
-
-    // Contracts signed
-    if(allTags.includes('contract')||allTags.includes('executed')) cont++;
-
-    // Sent to buyer
-    if(allTags.includes('buyer')||allTags.includes('sent to buyer')) sentToBuyer++;
-
-    // Won / closed
-    if(status==='won'||allTags.includes('won')||allTags.includes('closed')){
-      won++;
-      revenue += o.monetaryValue||0;
-    }
-  });
-
-  // opted out — check both contacts and opportunity tags
-  contacts.forEach(c=>{
-    const t = (c.tags||[]).join(' ').toLowerCase();
-    if(t.includes('opt')||t.includes('dnc')||t.includes('stop')) opt++;
-  });
-  // also check opportunity tags for opted out
-  ops.forEach(o=>{
-    const t = (o.tags||[]).join(' ').toLowerCase();
-    if(t.includes('opt out')||t.includes('opted out')||t.includes('dnc')) opt++;
+    if(status==='won') { won++; revenue += o.monetaryValue||0; }
   });
 
   // SMS from conversations
@@ -597,7 +584,7 @@ function processGHL({ops,contacts,convs}){
 
   return{
     stages, t1, cont, won, opt, revenue, offers, sentToBuyer, responses,
-    leads: contacts.length, sms,
+    leads: contacts.length, sms, jerryCalls,
     lpc: won>0 ? Math.round(contacts.length/won) : 0,
     ops
   };
