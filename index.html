@@ -432,30 +432,22 @@ function getDateRange(){
 }
 
 async function fetchVapi(k){
-  const {start,end} = getDateRange();
-  // Vapi confirmed fields: createdAt, startedAt, endedAt, endedReason, status, type
-  // No durationSeconds — must calculate from startedAt/endedAt
-  // Date filter uses createdAtGt / createdAtLt
+  const {start, end} = getDateRange();
   let allCalls = [];
-  let lastCreatedAt = null;
-
+  let upperBound = end;
   for(let i=0;i<10;i++){
-    let url = 'https://api.vapi.ai/call?assistantId='+k.asst+'&limit=100';
-    if(start) url += '&createdAtGt='+start.replace('+','%2B');
-    if(end)   url += '&createdAtLt='+end.replace('+','%2B');
-    if(lastCreatedAt) url += '&createdAtLt='+lastCreatedAt.replace('+','%2B');
-
-    const res = await fetch(url, {headers:{Authorization:'Bearer '+k.vapi}});
+    const url = "https://api.vapi.ai/call?assistantId="+k.asst+"&limit=100&createdAtGt="+start+"&createdAtLt="+upperBound;
+    const res = await fetch(url, {headers:{Authorization:"Bearer "+k.vapi}});
     if(!res.ok){
       const err = await res.text();
-      throw new Error('Vapi API '+res.status+': '+err.slice(0,150));
+      throw new Error("Vapi "+res.status+": "+err.slice(0,200));
     }
     const d = await res.json();
     const calls = Array.isArray(d)?d:(d.calls||d.data||[]);
     if(!calls.length) break;
     allCalls = allCalls.concat(calls);
     if(calls.length < 100) break;
-    lastCreatedAt = calls[calls.length-1].createdAt;
+    upperBound = calls[calls.length-1].createdAt;
   }
   return allCalls;
 }
