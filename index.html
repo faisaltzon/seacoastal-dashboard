@@ -426,7 +426,8 @@ function getDateRange(){
   } else if(currentRange==='month'){
     const s = new Date(now); s.setDate(1); s.setHours(0,0,0,0); start=s.toISOString();
   } else {
-    const s = new Date('2024-01-01T00:00:00.000Z'); start=s.toISOString();
+    // Vapi PAYG plan only keeps 14 days of history
+    const s = new Date(now); s.setDate(s.getDate()-14); s.setHours(0,0,0,0); start=s.toISOString();
   }
   return {start, end};
 }
@@ -502,8 +503,9 @@ function processVapi(calls){
 
 async function fetchAllGHL(url, headers, key){
   let all=[], page=1;
-  while(page<=20){
-    const r=await fetch(url+'&page='+page+'&limit=100',{headers});
+  while(page<=50){
+    const sep = url.includes('?') ? '&' : '?';
+    const r=await fetch(url+sep+'page='+page+'&limit=100',{headers});
     if(!r.ok) break;
     const d=await r.json();
     const items=d[key]||d.data||[];
