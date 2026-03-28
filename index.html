@@ -530,9 +530,8 @@ async function fetchGHL(k){
       +'&startAfter='+startMs+'&startBefore='+endMs, headers, 'opportunities'),
     // Contacts — no reliable date filter, always all-time for lead count
     fetchAllGHL('https://services.leadconnectorhq.com/contacts/?locationId='+k.loc, headers, 'contacts'),
-    // Conversations with date filter
-    fetchAllGHL('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc
-      +'&startAfterDate='+startMs+'&startBeforeDate='+endMs, headers, 'conversations')
+    // Conversations — no date filter supported, fetch all and filter client-side
+    fetchAllGHL('https://services.leadconnectorhq.com/conversations/search?locationId='+k.loc, headers, 'conversations')
   ]);
 
   if(!contacts.length) throw new Error('GHL contacts empty — check API key');
@@ -576,14 +575,17 @@ function processGHL({ops,contacts,convs,startMs,endMs}){
     if(status==='won'){ revenue += o.monetaryValue||0; }
   });
 
-  // SMS counting — one conversation thread = one contact
-  // lastMessageType TYPE_SMS confirmed from API
+  // SMS — filter by date range using lastMessageDate, count threads
   convs.forEach(c=>{
     const msgType = (c.lastMessageType||'').toUpperCase();
-    if(msgType.includes('SMS')){
-      sms++;
-      if((c.lastMessageDirection||'').toLowerCase()==='inbound') responses++;
-    }
+    if(!msgType.includes('SMS')) return;
+    // Filter by date if available
+    const msgDate = c.lastMessageDate||c.dateUpdated||c.dateAdded||0;
+    const msgTs = msgDate ? new Date(msgDate).getTime() : 0;
+    if(startMs && msgTs && msgTs < startMs) return;
+    if(endMs && msgTs && msgTs > endMs) return;
+    sms++;
+    if((c.lastMessageDirection||'').toLowerCase()==='inbound') responses++;
   });
 
   return{
