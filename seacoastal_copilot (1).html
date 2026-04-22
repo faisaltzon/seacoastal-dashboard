@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Seacoastal Copilot</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f172a; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  .header { background: #1e293b; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #334155; }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 36px; height: 36px; background: linear-gradient(135deg, #3b82f6, #06b6d4); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .header h1 { font-size: 15px; font-weight: 700; }
+  .header p { font-size: 11px; color: #94a3b8; }
+  .clear-btn { background: #334155; border: none; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+
+  .tabs { display: flex; gap: 4px; padding: 12px 16px 0; background: #0f172a; }
+  .tab { flex: 1; padding: 10px 4px; border: none; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; color: #94a3b8; background: #1e293b; transition: all 0.2s; }
+  .tab.active-live { background: linear-gradient(135deg, #ef4444, #f97316); color: white; }
+  .tab.active-quick { background: linear-gradient(135deg, #3b82f6, #06b6d4); color: white; }
+  .tab.active-chat { background: linear-gradient(135deg, #3b82f6, #06b6d4); color: white; }
+
+  .container { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; max-width: 600px; margin: 0 auto; }
+
+  /* LIVE MODE */
+  .live-btn-wrap { display: flex; justify-content: center; padding: 8px 0; }
+  .live-btn { width: 130px; height: 130px; border-radius: 50%; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 700; color: white; transition: all 0.3s; position: relative; }
+  .live-btn.off { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 8px 30px rgba(34,197,94,0.3); }
+  .live-btn.on { background: linear-gradient(135deg, #ef4444, #f97316); box-shadow: 0 8px 30px rgba(239,68,68,0.5); }
+  .live-btn.on::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; border: 3px solid rgba(239,68,68,0.4); animation: pulse 1.5s infinite; }
+  .live-btn .icon { font-size: 36px; }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.1);opacity:0.5} }
+
+  .status-text { text-align: center; font-size: 13px; font-weight: 600; }
+  .status-live { color: #ef4444; }
+  .status-ready { color: #22c55e; }
+
+  .manual-input { background: #1e293b; border-radius: 12px; padding: 12px; border: 1px solid #334155; }
+  .manual-input p { font-size: 11px; color: #64748b; font-weight: 600; margin-bottom: 8px; }
+  .manual-row { display: flex; gap: 8px; }
+  .manual-row input { flex: 1; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; outline: none; }
+  .manual-row input:focus { border-color: #22c55e; }
+  .go-btn { background: linear-gradient(135deg, #22c55e, #16a34a); border: none; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; white-space: nowrap; }
+  .go-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .transcript-box { background: #1e293b; border-radius: 10px; padding: 12px; border: 1px solid #334155; }
+  .transcript-box p.label { font-size: 10px; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+  .transcript-box p.text { font-size: 13px; color: #cbd5e1; font-style: italic; }
+
+  .response-box { background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(16,185,129,0.1)); border-radius: 14px; padding: 20px; border: 2px solid rgba(34,197,94,0.4); min-height: 160px; display: flex; align-items: center; justify-content: center; }
+  .response-box .empty { text-align: center; color: #475569; }
+  .response-box .empty .big-icon { font-size: 40px; margin-bottom: 8px; }
+  .response-box .empty p { font-size: 13px; }
+  .response-box .result .say-label { font-size: 11px; color: #22c55e; font-weight: 700; margin-bottom: 10px; }
+  .response-box .result .say-text { font-size: 20px; line-height: 1.5; font-weight: 600; color: white; }
+  .loading-box { text-align: center; }
+  .loading-box .spinner { width: 36px; height: 36px; border: 3px solid #334155; border-top-color: #22c55e; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-box p { font-size: 13px; color: #22c55e; }
+
+  .history-box { background: #1e293b; border-radius: 10px; padding: 12px; border: 1px solid #334155; max-height: 120px; overflow-y: auto; }
+  .history-box .h-label { font-size: 10px; color: #64748b; font-weight: 700; margin-bottom: 8px; }
+  .history-item { border-left: 2px solid #3b82f6; padding-left: 8px; margin-bottom: 8px; }
+  .history-item .time { font-size: 10px; color: #64748b; }
+  .history-item .agent-said { font-size: 11px; color: #94a3b8; font-style: italic; }
+  .history-item .response { font-size: 11px; color: #22c55e; margin-top: 2px; }
+
+  /* QUICK MODE */
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .quick-btn { background: #1e293b; border: 1px solid #334155; color: white; padding: 12px 10px; border-radius: 10px; cursor: pointer; font-size: 11px; font-weight: 600; text-align: left; transition: all 0.2s; line-height: 1.3; }
+  .quick-btn:hover { background: #1d4ed8; border-color: #3b82f6; }
+  .quick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .quick-response { background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(6,182,212,0.15)); border-radius: 14px; padding: 20px; border: 2px solid rgba(59,130,246,0.4); min-height: 140px; display: flex; align-items: center; justify-content: center; }
+  .quick-response .say-label { font-size: 11px; color: #3b82f6; font-weight: 700; margin-bottom: 10px; }
+  .quick-response .say-text { font-size: 18px; line-height: 1.5; font-weight: 600; }
+
+  /* CHAT MODE */
+  .chat-messages { min-height: 200px; max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+  .msg { display: flex; }
+  .msg.user { justify-content: flex-end; }
+  .msg.assistant { justify-content: flex-start; }
+  .bubble { max-width: 85%; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+  .bubble.user { background: #334155; border-bottom-right-radius: 4px; }
+  .bubble.assistant { background: linear-gradient(135deg, rgba(30,64,175,0.4), rgba(7,89,133,0.4)); border: 1px solid rgba(59,130,246,0.3); border-bottom-left-radius: 4px; }
+  .bubble .blabel { font-size: 10px; font-weight: 700; margin-bottom: 4px; }
+  .bubble.user .blabel { color: #94a3b8; }
+  .bubble.assistant .blabel { color: #06b6d4; }
+  .chat-input { background: #1e293b; border-radius: 12px; padding: 12px; border: 1px solid #334155; }
+  .chat-row { display: flex; gap: 8px; }
+  .chat-row input { flex: 1; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; outline: none; }
+  .chat-row input:focus { border-color: #3b82f6; }
+  .mic-btn { background: #334155; border: none; color: white; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+  .mic-btn.active { background: #ef4444; animation: pulse 1s infinite; }
+  .send-btn { background: linear-gradient(135deg, #3b82f6, #06b6d4); border: none; color: white; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .hint { font-size: 11px; color: #475569; text-align: center; margin-top: 6px; }
+
+  .empty-chat { text-align: center; padding: 30px 0; color: #475569; }
+  .empty-chat .big { font-size: 36px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">🧠</div>
+    <div>
+      <h1>Seacoastal Copilot</h1>
+      <p>Faisal's Agent Call Brain — Jerry AI</p>
+    </div>
+  </div>
+  <button class="clear-btn" onclick="clearAll()">🗑 Clear</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active-live" id="tab-live" onclick="setMode('live')">📡 Live</button>
+  <button class="tab" id="tab-quick" onclick="setMode('quick')">⚡ Quick</button>
+  <button class="tab" id="tab-chat" onclick="setMode('chat')">💬 Chat</button>
+</div>
+
+<!-- LIVE MODE -->
+<div id="mode-live" class="container">
+  <div class="live-btn-wrap">
+    <button class="live-btn off" id="live-btn" onclick="toggleLive()">
+      <span class="icon">📡</span>
+      <span id="live-btn-text">START</span>
+    </button>
+  </div>
+  <p class="status-text" id="live-status"><span class="status-ready">👆 Tap START — put agent on speaker</span></p>
+
+  <div class="manual-input">
+    <p>💬 OR TYPE WHAT AGENT SAID:</p>
+    <div class="manual-row">
+      <input type="text" id="live-manual" placeholder="e.g. What's your offer?" onkeypress="if(event.key==='Enter')submitManual()">
+      <button class="go-btn" id="go-btn" onclick="submitManual()">Go ⚡</button>
+    </div>
+  </div>
+
+  <div id="transcript-box" class="transcript-box" style="display:none">
+    <p class="label">🎤 HEARING...</p>
+    <p class="text" id="transcript-text"></p>
+  </div>
+
+  <div class="response-box" id="live-response-box">
+    <div class="empty">
+      <div class="big-icon">📡</div>
+      <p>Tap START, put agent on speaker<br>Responses appear here automatically</p>
+    </div>
+  </div>
+
+  <div class="history-box" id="live-history" style="display:none">
+    <p class="h-label">RECENT EXCHANGES</p>
+    <div id="history-items"></div>
+  </div>
+</div>
+
+<!-- QUICK MODE -->
+<div id="mode-quick" class="container" style="display:none">
+  <div class="quick-grid" id="quick-grid"></div>
+  <div class="quick-response" id="quick-response-box">
+    <div class="empty" style="text-align:center;color:#475569">
+      <div style="font-size:36px;margin-bottom:8px">⚡</div>
+      <p style="font-size:13px">Tap a button to get your response</p>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT MODE -->
+<div id="mode-chat" class="container" style="display:none">
+  <div class="chat-messages" id="chat-messages">
+    <div class="empty-chat">
+      <div class="big">🏠</div>
+      <p style="font-size:13px">Type what the agent just said</p>
+    </div>
+  </div>
+  <div class="chat-input">
+    <div class="chat-row">
+      <button class="mic-btn" id="chat-mic" onclick="toggleChatMic()">🎤</button>
+      <input type="text" id="chat-input" placeholder="Type what the agent said..." onkeypress="if(event.key==='Enter')sendChat()">
+      <button class="send-btn" id="send-btn" onclick="sendChat()">➤</button>
+    </div>
+    <p class="hint" id="chat-hint">Tap mic to speak OR type</p>
+  </div>
+</div>
+
+<script>
+const BRAIN = `You are Faisal's real-time VOICE CALL assistant. Faisal is ON A LIVE PHONE CALL with a real estate agent RIGHT NOW. Give him the EXACT words to say — short, natural, ready to read out loud. Never explain. Never add labels. Just the words.
+
+JERRY'S VOICE: Casual Houston investor. 1-2 sentences max. "yeah," "gotcha," "not gonna lie." Never formal. Mirror agent energy. Periods not exclamation points.
+
+WHO WE ARE: Jerry / Seacoastal Home LLC. Small crew, Houston. Buy, fix, hold or flip. Cash buyers. Close 10-20 days. Agent gets both sides commission.
+
+BUY CRITERIA: Single family Houston metro only. Needs rehab/distressed. No condos, no townhouses, no turnkey, no new builds 2009+.
+
+MAO FORMULA (NEVER SAY): MAO = (ARV x 70%) - Rehab - $15,000. NEVER give price on call. Always: "let me run this by my team."
+
+PHASES:
+1. INTRO: "Hey — Jerry here. Small investment crew in Houston, always looking for properties that need some work. Got anything that might be a fit?"
+2. GET ADDRESS: "Send me the address when you're ready — I'll pull up the numbers."
+3. DISCOVERY (one at a time): motivation → condition → ARV → timeline → walk-away number → contact info
+4. AFTER DISCOVERY: "Got everything I need. Let me run this by my team — is the seller flexible or firm on price?"
+5. DEFER OFFER: "I don't want to throw a number out before my team looks it over. Give me a bit."
+6. DOUBLE-END PITCH: "We're unrepresented on the buy side — you could rep us and collect both sides. Usually 3%. Work for you?"
+
+OBJECTIONS:
+- Offer too low → "You're right — it is low. But a seller who said no at first often takes cash when they get tired of waiting. Will you present it verbally?"
+- Seller won't budge → "Fast close, no contingencies, as-is — sometimes that's worth more than a higher number that falls through."
+- Already have offers → "If any fall through, keep me in mind. What's the address so I have it on file?"
+- Don't work with investors → "I get that — I'm just wondering if you have anything sitting a little longer than you'd like?"
+- What's your company → "Seacoastal Home LLC. Cash buyers, close fast, always take care of our agents."
+- Send me an email → "Of course — what's the best email? And what address are we talking about?"
+
+SPECIAL EXITS:
+- Renovated/turnkey → "Probably not our fit — we like ones with work left. Got anything else?"
+- New build 2009+ → "Newer stuff isn't our lane. Got anything older that needs some love?"
+- Condo/townhouse → "We're focused on single family right now — that one won't work. Any SFR off market?"
+- Foreclosure/short sale → Note internally, keep going, don't mention it.
+- Hostile agent → "Understood. I'll leave you alone — appreciate your time."
+- Opt out → "Absolutely, removing you right now. Sorry to bother you — have a great day."
+
+END CALL:
+- Deal done → "Perfect — my acquisition manager will call you in 15-20 min to lock it in. Really appreciate your time!"
+- Good rapport no deal → "Keep me in mind when something needs a fast close — I'll make sure you're covered."
+- Natural wrap → "Sounds great — I'll follow up shortly. Have a great day!"
+
+RESPONSE RULES: Under 35 words. Just the words to say. Sound like real Houston investor.`;
+
+const QUICK_BUTTONS = [
+  { label: "🟢 Cold intro opener", text: "Starting a cold call to a listing agent I've never spoken to before" },
+  { label: "📍 Has a property", text: "Agent mentioned they might have a property that needs work" },
+  { label: "💰 What's your offer?", text: "Agent is demanding to know our offer before I've run numbers" },
+  { label: "📉 Offer too low", text: "Agent says our offer is way too low and seller won't accept it" },
+  { label: "🏚️ Seller won't budge", text: "Seller has a firm number and refuses to come down on price" },
+  { label: "📋 Already have offers", text: "Agent says they already have multiple offers on the property" },
+  { label: "✨ It's renovated", text: "Agent says the property is fully renovated and move-in ready turnkey" },
+  { label: "🏗️ New build", text: "Agent says the property is a newer build from 2015" },
+  { label: "🏦 Foreclosure", text: "Agent says it's a foreclosure or short sale" },
+  { label: "🏢 Condo/townhouse", text: "Agent says the property is a condo or townhouse" },
+  { label: "😤 Agent pushy", text: "Agent is being impatient demanding a number right now" },
+  { label: "🤔 Who are you?", text: "Agent asking who we are and what company we're with" },
+  { label: "🚫 No investors", text: "Agent says they don't work with investors" },
+  { label: "💵 Double-end pitch", text: "Good moment to pitch agent on representing us as buyer agent for both commissions" },
+  { label: "📧 Send email", text: "Agent saying to send them an email instead of talking now" },
+  { label: "⏰ Agent busy", text: "Agent says they don't have time right now" },
+  { label: "🤝 Probate property", text: "Agent says the seller is dealing with probate on the property" },
+  { label: "👋 Wrap up call", text: "Call wrapping up naturally, want to leave strong and get future deals" },
+];
+
+// State
+let currentMode = 'live';
+let liveOn = false;
+let loading = false;
+let chatHistory = [];
+let recognition = null;
+let chatRecognition = null;
+let silenceTimer = null;
+let lastTranscript = '';
+let isListeningRef = false;
+let chatMicOn = false;
+
+// Init quick buttons
+function initQuickButtons() {
+  const grid = document.getElementById('quick-grid');
+  grid.innerHTML = QUICK_BUTTONS.map((b, i) => 
+    `<button class="quick-btn" onclick="quickFire('${b.text.replace(/'/g,"\\'")}', ${i})">${b.label}</button>`
+  ).join('');
+}
+
+// Mode switching
+function setMode(mode) {
+  currentMode = mode;
+  ['live','quick','chat'].forEach(m => {
+    document.getElementById('mode-'+m).style.display = m === mode ? 'flex' : 'none';
+    document.getElementById('mode-'+m).style.flexDirection = 'column';
+    const tab = document.getElementById('tab-'+m);
+    tab.className = 'tab';
+    if(m === mode) tab.classList.add('active-'+m);
+  });
+}
+
+// Clear all
+function clearAll() {
+  chatHistory = [];
+  document.getElementById('chat-messages').innerHTML = '<div class="empty-chat"><div class="big">🏠</div><p style="font-size:13px">Type what the agent just said</p></div>';
+  document.getElementById('live-response-box').innerHTML = '<div class="empty"><div class="big-icon">📡</div><p>Tap START, put agent on speaker<br>Responses appear here automatically</p></div>';
+  document.getElementById('quick-response-box').innerHTML = '<div class="empty" style="text-align:center;color:#475569"><div style="font-size:36px;margin-bottom:8px">⚡</div><p style="font-size:13px">Tap a button to get your response</p></div>';
+  document.getElementById('history-items').innerHTML = '';
+  document.getElementById('live-history').style.display = 'none';
+}
+
+// API call
+async function askClaude(userMessage, mode) {
+  const messages = mode === 'chat' 
+    ? [...chatHistory, { role: 'user', content: `Agent just said: "${userMessage}". Give me the exact words to say back.` }]
+    : [{ role: 'user', content: `Agent just said: "${userMessage}". Give me the exact words to say back.` }];
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 300,
+      system: BRAIN,
+      messages
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+// LIVE MODE
+function toggleLive() {
+  if (!liveOn) {
+    startLive();
+  } else {
+    stopLive();
+  }
+}
+
+function startLive() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Voice recognition requires Chrome browser. Use the text input below instead.');
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    liveOn = true;
+    isListeningRef = true;
+    document.getElementById('live-btn').className = 'live-btn on';
+    document.getElementById('live-btn-text').textContent = 'STOP';
+    document.getElementById('live-status').innerHTML = '<span class="status-live">🔴 LIVE — listening to your call</span>';
+  };
+
+  recognition.onresult = (e) => {
+    let final = '', interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    
+    const combined = (final + interim).trim();
+    if (combined) {
+      document.getElementById('transcript-box').style.display = 'block';
+      document.getElementById('transcript-text').textContent = combined;
+    }
+
+    if (final.trim() && final.trim() !== lastTranscript) {
+      lastTranscript = final.trim();
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        if (lastTranscript.length > 8 && !loading) {
+          generateLiveResponse(lastTranscript);
+        }
+      }, 1500);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'not-allowed') {
+      alert('Microphone access denied. Please allow mic access in your browser settings, then try again.');
+      stopLive();
+    }
+  };
+
+  recognition.onend = () => {
+    if (isListeningRef) {
+      setTimeout(() => { try { recognition.start(); } catch(e) {} }, 200);
+    }
+  };
+
+  try {
+    recognition.start();
+  } catch(e) {
+    alert('Could not start microphone. Please use the text input below.');
+  }
+}
+
+function stopLive() {
+  isListeningRef = false;
+  liveOn = false;
+  if (recognition) { try { recognition.stop(); } catch(e) {} }
+  if (silenceTimer) clearTimeout(silenceTimer);
+  document.getElementById('live-btn').className = 'live-btn off';
+  document.getElementById('live-btn-text').textContent = 'START';
+  document.getElementById('live-status').innerHTML = '<span class="status-ready">👆 Tap START — put agent on speaker</span>';
+  document.getElementById('transcript-box').style.display = 'none';
+}
+
+async function generateLiveResponse(text) {
+  if (loading) return;
+  loading = true;
+  document.getElementById('go-btn').disabled = true;
+  document.getElementById('live-response-box').innerHTML = '<div class="loading-box"><div class="spinner"></div><p>Getting your response...</p></div>';
+  
+  try {
+    const reply = await askClaude(text, 'live');
+    document.getElementById('live-response-box').innerHTML = `<div class="result" style="width:100%"><p class="say-label">👄 SAY THIS NOW:</p><p class="say-text">${reply}</p></div>`;
+    addHistory(text, reply);
+    lastTranscript = '';
+    document.getElementById('transcript-box').style.display = 'none';
+    document.getElementById('transcript-text').textContent = '';
+  } catch(e) {
+    document.getElementById('live-response-box').innerHTML = `<div class="result" style="width:100%"><p class="say-label" style="color:#ef4444">ERROR:</p><p class="say-text" style="font-size:13px">${e.message}</p></div>`;
+  }
+  
+  loading = false;
+  document.getElementById('go-btn').disabled = false;
+}
+
+function submitManual() {
+  const val = document.getElementById('live-manual').value.trim();
+  if (!val || loading) return;
+  document.getElementById('live-manual').value = '';
+  generateLiveResponse(val);
+}
+
+function addHistory(agentSaid, response) {
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const item = document.createElement('div');
+  item.className = 'history-item';
+  item.innerHTML = `<p class="time">${time}</p><p class="agent-said">"${agentSaid}"</p><p class="response">→ ${response}</p>`;
+  const container = document.getElementById('history-items');
+  container.insertBefore(item, container.firstChild);
+  document.getElementById('live-history').style.display = 'block';
+}
+
+// QUICK MODE
+async function quickFire(text, idx) {
+  if (loading) return;
+  loading = true;
+  
+  const btns = document.querySelectorAll('.quick-btn');
+  btns.forEach(b => b.disabled = true);
+  
+  document.getElementById('quick-response-box').innerHTML = '<div class="loading-box"><div class="spinner"></div><p>Getting your response...</p></div>';
+  
+  try {
+    const reply = await askClaude(text, 'quick');
+    document.getElementById('quick-response-box').innerHTML = `<div style="width:100%"><p class="say-label" style="font-size:11px;color:#3b82f6;font-weight:700;margin-bottom:10px">👄 SAY THIS NOW:</p><p class="say-text" style="font-size:18px;line-height:1.5;font-weight:600">${reply}</p></div>`;
+  } catch(e) {
+    document.getElementById('quick-response-box').innerHTML = `<p style="color:#ef4444;font-size:13px">${e.message}</p>`;
+  }
+  
+  loading = false;
+  btns.forEach(b => b.disabled = false);
+}
+
+// CHAT MODE
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const val = input.value.trim();
+  if (!val || loading) return;
+  input.value = '';
+  loading = true;
+
+  // Clear empty state
+  const msgs = document.getElementById('chat-messages');
+  if (msgs.querySelector('.empty-chat')) msgs.innerHTML = '';
+
+  // Add user bubble
+  msgs.innerHTML += `<div class="msg user"><div class="bubble user"><p class="blabel">AGENT SAID:</p>${val}</div></div>`;
+
+  // Add loading
+  const loadId = 'load-'+Date.now();
+  msgs.innerHTML += `<div id="${loadId}" class="msg assistant"><div class="bubble assistant"><div class="loading-box"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div></div></div></div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const reply = await askClaude(val, 'chat');
+    chatHistory.push({role:'user', content: val});
+    chatHistory.push({role:'assistant', content: reply});
+    
+    document.getElementById(loadId).outerHTML = `<div class="msg assistant"><div class="bubble assistant"><p class="blabel">SAY THIS:</p>${reply}</div></div>`;
+  } catch(e) {
+    document.getElementById(loadId).outerHTML = `<div class="msg assistant"><div class="bubble assistant" style="border-color:rgba(239,68,68,0.3)"><p style="color:#ef4444;font-size:12px">${e.message}</p></div></div>`;
+  }
+
+  loading = false;
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// Chat mic
+function toggleChatMic() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { alert('Voice needs Chrome browser.'); return; }
+
+  if (chatMicOn) {
+    chatMicOn = false;
+    if (chatRecognition) chatRecognition.stop();
+    document.getElementById('chat-mic').className = 'mic-btn';
+    document.getElementById('chat-hint').textContent = 'Tap mic to speak OR type';
+    return;
+  }
+
+  chatRecognition = new SpeechRecognition();
+  chatRecognition.lang = 'en-US';
+  chatRecognition.onresult = (e) => {
+    document.getElementById('chat-input').value = Array.from(e.results).map(r => r[0].transcript).join('');
+  };
+  chatRecognition.onend = () => {
+    chatMicOn = false;
+    document.getElementById('chat-mic').className = 'mic-btn';
+    document.getElementById('chat-hint').textContent = 'Tap mic to speak OR type';
+  };
+  chatRecognition.onerror = () => {
+    chatMicOn = false;
+    document.getElementById('chat-mic').className = 'mic-btn';
+  };
+
+  chatMicOn = true;
+  document.getElementById('chat-mic').className = 'mic-btn active';
+  document.getElementById('chat-hint').textContent = '🔴 Recording...';
+  chatRecognition.start();
+}
+
+// Init
+initQuickButtons();
+setMode('live');
+</script>
+</body>
+</html>
